@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Dental Note Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chosen Palette: Modern Slate & Amber -->
+    <!-- Application Structure Plan: A task-oriented, multi-step single-page application that guides the user through a linear workflow: 1) Record Audio, 2) Analyze Conversation, and 3) Review & Finalize Note. This structure was chosen because it mirrors the natural, real-world process a clinician follows, making the application intuitive and easy to use. The UI will dynamically transition between these three states, presenting only the relevant information and actions for each step, which minimizes cognitive load and prevents user error. -->
+    <!-- Visualization & Content Choices: 
+        - Report Info: Conversation Transcript -> Goal: Organize/Inform -> Viz/Method: A styled list presenting diarized (speaker-labeled) text in a dedicated, scrollable panel. -> Interaction: Scrollable display. -> Justification: This is the most direct and universally understood way to present a conversation log, making it easy for the dentist to reference during review.
+        - Report Info: Generated Clinical Note (SOAP) -> Goal: Inform/Organize -> Viz/Method: Four distinct, labeled textarea elements within a form for Subjective, Objective, Assessment, and Plan. -> Interaction: The dentist can directly edit the AI-generated text in each section. -> Justification: Separating the SOAP note into its constituent parts makes it scannable and simplifies editing, which is critical for the human-in-the-loop validation process.
+        - Report Info: Application Status -> Goal: Inform -> Viz/Method: Dynamic text indicators, progress bars, and icon changes (e.g., a "recording" icon). -> Interaction: Automatic updates based on application state. -> Justification: Provides clear, immediate feedback to the user on the system's current process (e.g., "Recording...", "Analyzing...", "Ready for Review"), which builds trust and clarifies what is happening.
+        - Library/Method: All interactions and dynamic content are handled with vanilla JavaScript, manipulating the DOM. No external visualization libraries are needed for this phase.
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+    <style>
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .transition-all { transition: all 0.3s ease-in-out; }
+        .step-inactive { display: none; }
+        .step-active { display: flex; flex-direction: column; align-items: center; }
+        .pulse-red { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div id="app" class="container mx-auto p-4 md:p-6">
+
+        <!-- Header -->
+        <header class="mb-6 md:mb-8 text-left">
+            <div class="flex items-center gap-3 mb-1">
+                 <div class="p-2 bg-slate-200 rounded-lg">
+                    <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+                 </div>
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-900">AI Dental Note Assistant</h1>
+            </div>
+            <p class="text-slate-500">A modern assistant to streamline your clinical documentation.</p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="bg-white rounded-lg shadow-sm border border-slate-200 min-h-[60vh] flex items-center justify-center p-6 md:p-8">
+
+            <!-- Step 1: Record Audio -->
+            <div id="step-record" class="step-active w-full">
+                <h2 class="text-xl font-semibold mb-2 text-slate-700">Ready to Start</h2>
+                <p class="text-slate-500 mb-8 max-w-md text-center">Place your recording device in a central location and click the microphone to begin the session.</p>
+                <button id="record-btn" class="relative w-24 h-24 bg-slate-700 text-white rounded-full shadow-md hover:bg-slate-800 transition-all focus:outline-none focus:ring-4 focus:ring-slate-300 flex items-center justify-center mx-auto">
+                    <div id="record-icon-container">
+                        <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7a1 1 0 100 2h6a1 1 0 100-2h-2v-2.07z" clip-rule="evenodd"></path></svg>
+                    </div>
+                </button>
+                <p id="record-status" class="mt-4 text-base font-medium text-slate-600">Click to Record</p>
+            </div>
+
+            <!-- Step 2: Processing -->
+            <div id="step-processing" class="step-inactive w-full max-w-lg">
+                <h2 class="text-xl font-semibold mb-4 text-slate-700">Analyzing Session</h2>
+                <div class="w-full bg-slate-200 rounded-full h-2.5 mb-2">
+                    <div id="progress-bar" class="bg-amber-500 h-2.5 rounded-full transition-all" style="width: 10%"></div>
+                </div>
+                <p id="processing-status" class="mt-2 text-base font-medium text-slate-600 text-center">Transcribing audio...</p>
+            </div>
+
+            <!-- Step 3: Review Note -->
+            <div id="step-review" class="step-inactive !flex-row !items-start w-full">
+                <div class="w-full">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-xl font-semibold text-slate-700">Review Generated Note</h2>
+                        <button id="start-over-btn" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition-all font-medium text-sm">Start New Session</button>
+                    </div>
+                    <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+                        <!-- Left: SOAP Note -->
+                        <div class="lg:col-span-3 space-y-4">
+                            <div>
+                                <label for="soap-s" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Subjective</label>
+                                <textarea id="soap-s" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                            </div>
+                            <div>
+                                <label for="soap-o" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Objective</label>
+                                <textarea id="soap-o" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                            </div>
+                            <div>
+                                <label for="soap-a" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Assessment</label>
+                                <textarea id="soap-a" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                            </div>
+                            <div>
+                                <label for="soap-p" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Plan</label>
+                                <textarea id="soap-p" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                            </div>
+                             <div class="flex justify-end gap-3 items-center">
+                                <span id="copy-success-msg" class="text-amber-600 font-medium text-sm hidden">Note Copied!</span>
+                                <button id="copy-note-btn" class="bg-slate-700 text-white px-5 py-2 rounded-md hover:bg-slate-800 transition-all font-semibold focus:outline-none focus:ring-4 focus:ring-slate-300 text-sm">Copy Full Note</button>
+                            </div>
+                        </div>
+                        <!-- Right: Transcript -->
+                        <div class="lg:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 h-[calc(100vh-20rem)] flex flex-col">
+                            <h3 class="text-base font-semibold mb-3 text-slate-800">Conversation Transcript</h3>
+                            <div id="transcript-container" class="overflow-y-auto flex-grow pr-2 space-y-3">
+                                <!-- Transcript will be injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const appState = {
+                currentStep: 'record',
+                isRecording: false,
+            };
+
+            const stepRecordEl = document.getElementById('step-record');
+            const stepProcessingEl = document.getElementById('step-processing');
+            const stepReviewEl = document.getElementById('step-review');
+            
+            const recordBtn = document.getElementById('record-btn');
+            const recordStatusEl = document.getElementById('record-status');
+            const recordIconContainer = document.getElementById('record-icon-container');
+
+            const progressBar = document.getElementById('progress-bar');
+            const processingStatusEl = document.getElementById('processing-status');
+
+            const transcriptContainer = document.getElementById('transcript-container');
+            const soapS = document.getElementById('soap-s');
+            const soapO = document.getElementById('soap-o');
+            const soapA = document.getElementById('soap-a');
+            const soapP = document.getElementById('soap-p');
+
+            const startOverBtn = document.getElementById('start-over-btn');
+            const copyNoteBtn = document.getElementById('copy-note-btn');
+            const copySuccessMsg = document.getElementById('copy-success-msg');
+
+            const micIcon = `<svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7a1 1 0 100 2h6a1 1 0 100-2h-2v-2.07z" clip-rule="evenodd"></path></svg>`;
+            const stopIcon = `<svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5z"></path></svg>`;
+
+
+            function switchStep(step) {
+                appState.currentStep = step;
+                [stepRecordEl, stepProcessingEl, stepReviewEl].forEach(el => {
+                    el.classList.add('step-inactive');
+                    el.classList.remove('step-active');
+                });
+                document.getElementById(`step-${step}`).classList.remove('step-inactive');
+                document.getElementById(`step-${step}`).classList.add('step-active');
+            }
+
+            function simulateProcessing() {
+                switchStep('processing');
+                
+                setTimeout(() => {
+                    processingStatusEl.textContent = 'Transcribing audio...';
+                    progressBar.style.width = '30%';
+                }, 500);
+
+                setTimeout(() => {
+                    processingStatusEl.textContent = 'Identifying speakers...';
+                    progressBar.style.width = '50%';
+                }, 2000);
+                
+                setTimeout(() => {
+                    processingStatusEl.textContent = 'Extracting clinical data...';
+                    progressBar.style.width = '75%';
+                }, 4000);
+
+                setTimeout(() => {
+                    processingStatusEl.textContent = 'Generating SOAP note...';
+                    progressBar.style.width = '90%';
+                }, 5500);
+
+                setTimeout(() => {
+                    progressBar.style.width = '100%';
+                    populateReviewData();
+                    switchStep('review');
+                }, 7000);
+            }
+
+            function populateReviewData() {
+                const dummyTranscript = [
+                    { speaker: 'Dentist', text: 'Good morning, how can I help you today?' },
+                    { speaker: 'Patient', text: 'Hi, I\'ve been having a really sharp pain in my upper right tooth for the past week, especially when I drink something cold.' },
+                    { speaker: 'Dentist', text: 'Okay, let\'s take a look. Can you point to the exact tooth?' },
+                    { speaker: 'Patient', text: 'It\'s this one right here, the molar.' },
+                    { speaker: 'Dentist', text: 'Alright, I see. I\'m just going to tap on it gently. Let me know if it\'s tender.' },
+                    { speaker: 'Patient', text: 'Ouch, yes, that\'s definitely tender.' },
+                    { speaker: 'Dentist', text: 'Okay, thanks. Looking at the x-ray and from visual inspection, I see a significant area of decay on tooth number 3. It appears to be quite deep, which explains the sensitivity to cold and the tenderness.' },
+                    { speaker: 'Patient', text: 'So it\'s a cavity?' },
+                    { speaker: 'Dentist', text: 'Yes, a dental carie. Given its depth, I\'m recommending a composite filling. We need to clean out the decay and restore the tooth structure to prevent it from getting worse or leading to an infection.'},
+                    { speaker: 'Patient', text: 'Okay, let\'s do it.' },
+                ];
+
+                transcriptContainer.innerHTML = dummyTranscript.map(entry => `
+                    <div>
+                        <p class="font-semibold text-sm ${entry.speaker === 'Dentist' ? 'text-slate-700' : 'text-amber-700'}">${entry.speaker}</p>
+                        <p class="text-slate-600 text-sm">${entry.text}</p>
+                    </div>
+                `).join('');
+
+                soapS.value = "Patient reports sharp pain in upper right molar for the last week. States pain is exacerbated by cold stimuli and the tooth is tender to touch.";
+                soapO.value = "Visual examination reveals a large area of decay on tooth #3. X-ray confirms deep dental carie. Tooth is tender to percussion.";
+                soapA.value = "Dental caries on tooth #3.";
+                soapP.value = "Recommended treatment is a composite filling to remove decay and restore tooth. Patient consents to the treatment plan. Procedure scheduled.";
+            }
+
+            recordBtn.addEventListener('click', () => {
+                appState.isRecording = !appState.isRecording;
+                if (appState.isRecording) {
+                    recordStatusEl.textContent = 'Recording...';
+                    recordBtn.classList.add('bg-red-700', 'hover:bg-red-800', 'pulse-red');
+                    recordBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800');
+                    recordIconContainer.innerHTML = stopIcon;
+                } else {
+                    recordStatusEl.textContent = 'Processing...';
+                    recordBtn.disabled = true;
+                    simulateProcessing();
+                }
+            });
+
+            startOverBtn.addEventListener('click', () => {
+                appState.isRecording = false;
+                recordStatusEl.textContent = 'Click to Record';
+                recordBtn.classList.remove('bg-red-700', 'hover:bg-red-800', 'pulse-red');
+                recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
+                recordIconContainer.innerHTML = micIcon;
+                recordBtn.disabled = false;
+                progressBar.style.width = '0%';
+                processingStatusEl.textContent = 'Transcribing audio...';
+                switchStep('record');
+            });
+            
+            copyNoteBtn.addEventListener('click', () => {
+                const fullNote = `Subjective:\n${soapS.value}\n\nObjective:\n${soapO.value}\n\nAssessment:\n${soapA.value}\n\nPlan:\n${soapP.value}`;
+                
+                const dummyTextArea = document.createElement('textarea');
+                dummyTextArea.value = fullNote;
+                document.body.appendChild(dummyTextArea);
+                dummyTextArea.select();
+                try {
+                    document.execCommand('copy');
+                    copySuccessMsg.classList.remove('hidden');
+                    setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                }
+                document.body.removeChild(dummyTextArea);
+            });
+
+        });
+    </script>
+</body>
+</html>
