@@ -30,6 +30,18 @@
             0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); }
         }
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border-left-color: #4f46e5;
+            animation: spin 1s ease infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -47,28 +59,35 @@
             <p class="text-slate-500">A modern assistant to streamline your clinical documentation.</p>
         </header>
 
+        <!-- API Key Input -->
+        <div class="mb-6 max-w-2xl mx-auto">
+            <label for="api-key-input" class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
+            <input type="password" id="api-key-input" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500" placeholder="Enter your key to enable AI features">
+            <p class="text-xs text-gray-500 mt-1">Your key is used only in your browser and is not stored.</p>
+        </div>
+
         <!-- Main Content Area -->
         <main class="bg-white rounded-lg shadow-sm border border-slate-200 min-h-[60vh] flex items-center justify-center p-6 md:p-8">
 
             <!-- Step 1: Record Audio -->
             <div id="step-record" class="step-active w-full">
                 <h2 class="text-xl font-semibold mb-2 text-slate-700">Ready to Start</h2>
-                <p class="text-slate-500 mb-8 max-w-md text-center">Place your recording device in a central location and click the microphone to begin the session.</p>
-                <button id="record-btn" class="relative w-24 h-24 bg-slate-700 text-white rounded-full shadow-md hover:bg-slate-800 transition-all focus:outline-none focus:ring-4 focus:ring-slate-300 flex items-center justify-center mx-auto">
+                <p id="mic-permission-status" class="text-slate-500 mb-8 max-w-md text-center">Requesting microphone access...</p>
+                <button id="record-btn" disabled class="relative w-24 h-24 bg-slate-400 text-white rounded-full shadow-md transition-all flex items-center justify-center mx-auto cursor-not-allowed">
                     <div id="record-icon-container">
                         <svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7a1 1 0 100 2h6a1 1 0 100-2h-2v-2.07z" clip-rule="evenodd"></path></svg>
                     </div>
                 </button>
-                <p id="record-status" class="mt-4 text-base font-medium text-slate-600">Click to Record</p>
+                <p id="record-status" class="mt-4 text-base font-medium text-slate-600">Waiting for Permission</p>
             </div>
 
             <!-- Step 2: Processing -->
             <div id="step-processing" class="step-inactive w-full max-w-lg">
-                <h2 class="text-xl font-semibold mb-4 text-slate-700">Analyzing Session</h2>
-                <div class="w-full bg-slate-200 rounded-full h-2.5 mb-2">
-                    <div id="progress-bar" class="bg-amber-500 h-2.5 rounded-full transition-all" style="width: 10%"></div>
+                <div class="flex items-center justify-center mb-4">
+                    <div class="spinner"></div>
                 </div>
-                <p id="processing-status" class="mt-2 text-base font-medium text-slate-600 text-center">Transcribing audio...</p>
+                <h2 class="text-xl font-semibold mb-2 text-slate-700 text-center">Analyzing Session</h2>
+                <p id="processing-status" class="mt-2 text-base font-medium text-slate-600 text-center">Initializing...</p>
             </div>
 
             <!-- Step 3: Review Note -->
@@ -102,9 +121,15 @@
                                 <button id="copy-note-btn" class="bg-slate-700 text-white px-5 py-2 rounded-md hover:bg-slate-800 transition-all font-semibold focus:outline-none focus:ring-4 focus:ring-slate-300 text-sm">Copy Full Note</button>
                             </div>
                         </div>
-                        <!-- Right: Transcript -->
-                        <div class="lg:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 h-[calc(100vh-20rem)] flex flex-col">
-                            <h3 class="text-base font-semibold mb-3 text-slate-800">Conversation Transcript</h3>
+                        <!-- Right: Transcript & Audio Player -->
+                        <div class="lg:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 h-[75vh] flex flex-col">
+                            <div class="flex justify-between items-center mb-3">
+                                <h3 class="text-base font-semibold text-slate-800">Session Recording</h3>
+                                <div id="transcript-download-container"></div>
+                            </div>
+                            <div id="audio-player-container" class="mb-2"></div>
+                            <div id="download-container" class="mb-4"></div>
+                            <div class="w-full border-t border-slate-200 my-2"></div>
                             <div id="transcript-container" class="overflow-y-auto flex-grow pr-2 space-y-3">
                                 <!-- Transcript will be injected here -->
                             </div>
@@ -120,7 +145,13 @@
             const appState = {
                 currentStep: 'record',
                 isRecording: false,
+                mediaRecorder: null,
+                audioChunks: [],
+                audioBlob: null,
+                transcript: null,
             };
+
+            const apiKeyInput = document.getElementById('api-key-input');
 
             const stepRecordEl = document.getElementById('step-record');
             const stepProcessingEl = document.getElementById('step-processing');
@@ -128,12 +159,15 @@
             
             const recordBtn = document.getElementById('record-btn');
             const recordStatusEl = document.getElementById('record-status');
+            const micPermissionStatusEl = document.getElementById('mic-permission-status');
             const recordIconContainer = document.getElementById('record-icon-container');
 
-            const progressBar = document.getElementById('progress-bar');
             const processingStatusEl = document.getElementById('processing-status');
 
+            const audioPlayerContainer = document.getElementById('audio-player-container');
+            const downloadContainer = document.getElementById('download-container');
             const transcriptContainer = document.getElementById('transcript-container');
+            const transcriptDownloadContainer = document.getElementById('transcript-download-container');
             const soapS = document.getElementById('soap-s');
             const soapO = document.getElementById('soap-o');
             const soapA = document.getElementById('soap-a');
@@ -146,6 +180,35 @@
             const micIcon = `<svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7a1 1 0 100 2h6a1 1 0 100-2h-2v-2.07z" clip-rule="evenodd"></path></svg>`;
             const stopIcon = `<svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5z"></path></svg>`;
 
+            async function setupMicrophone() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    appState.mediaRecorder = new MediaRecorder(stream);
+
+                    appState.mediaRecorder.ondataavailable = event => {
+                        appState.audioChunks.push(event.data);
+                    };
+
+                    appState.mediaRecorder.onstop = () => {
+                        appState.audioBlob = new Blob(appState.audioChunks, { type: 'audio/wav' });
+                        appState.audioChunks = [];
+                        processRecording();
+                    };
+                    
+                    micPermissionStatusEl.textContent = 'Click the microphone to begin the session.';
+                    recordStatusEl.textContent = 'Click to Record';
+                    recordBtn.disabled = false;
+                    recordBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
+                    recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
+
+                } catch (err) {
+                    console.error("Error accessing microphone:", err);
+                    micPermissionStatusEl.textContent = 'Microphone access denied. Please enable it in your browser settings and refresh the page.';
+                    micPermissionStatusEl.classList.add('text-red-600');
+                    recordStatusEl.textContent = 'Microphone Required';
+                }
+            }
+            setupMicrophone();
 
             function switchStep(step) {
                 appState.currentStep = step;
@@ -157,91 +220,185 @@
                 document.getElementById(`step-${step}`).classList.add('step-active');
             }
 
-            function simulateProcessing() {
-                switchStep('processing');
-                
-                setTimeout(() => {
-                    processingStatusEl.textContent = 'Transcribing audio...';
-                    progressBar.style.width = '30%';
-                }, 500);
-
-                setTimeout(() => {
-                    processingStatusEl.textContent = 'Identifying speakers...';
-                    progressBar.style.width = '50%';
-                }, 2000);
-                
-                setTimeout(() => {
-                    processingStatusEl.textContent = 'Extracting clinical data...';
-                    progressBar.style.width = '75%';
-                }, 4000);
-
-                setTimeout(() => {
-                    processingStatusEl.textContent = 'Generating SOAP note...';
-                    progressBar.style.width = '90%';
-                }, 5500);
-
-                setTimeout(() => {
-                    progressBar.style.width = '100%';
-                    populateReviewData();
-                    switchStep('review');
-                }, 7000);
-            }
-
-            function populateReviewData() {
-                const dummyTranscript = [
-                    { speaker: 'Dentist', text: 'Good morning, how can I help you today?' },
-                    { speaker: 'Patient', text: 'Hi, I\'ve been having a really sharp pain in my upper right tooth for the past week, especially when I drink something cold.' },
-                    { speaker: 'Dentist', text: 'Okay, let\'s take a look. Can you point to the exact tooth?' },
-                    { speaker: 'Patient', text: 'It\'s this one right here, the molar.' },
-                    { speaker: 'Dentist', text: 'Alright, I see. I\'m just going to tap on it gently. Let me know if it\'s tender.' },
-                    { speaker: 'Patient', text: 'Ouch, yes, that\'s definitely tender.' },
-                    { speaker: 'Dentist', text: 'Okay, thanks. Looking at the x-ray and from visual inspection, I see a significant area of decay on tooth number 3. It appears to be quite deep, which explains the sensitivity to cold and the tenderness.' },
-                    { speaker: 'Patient', text: 'So it\'s a cavity?' },
-                    { speaker: 'Dentist', text: 'Yes, a dental carie. Given its depth, I\'m recommending a composite filling. We need to clean out the decay and restore the tooth structure to prevent it from getting worse or leading to an infection.'},
-                    { speaker: 'Patient', text: 'Okay, let\'s do it.' },
-                ];
-
-                transcriptContainer.innerHTML = dummyTranscript.map(entry => `
-                    <div>
-                        <p class="font-semibold text-sm ${entry.speaker === 'Dentist' ? 'text-slate-700' : 'text-amber-700'}">${entry.speaker}</p>
-                        <p class="text-slate-600 text-sm">${entry.text}</p>
-                    </div>
-                `).join('');
-
-                soapS.value = "Patient reports sharp pain in upper right molar for the last week. States pain is exacerbated by cold stimuli and the tooth is tender to touch.";
-                soapO.value = "Visual examination reveals a large area of decay on tooth #3. X-ray confirms deep dental carie. Tooth is tender to percussion.";
-                soapA.value = "Dental caries on tooth #3.";
-                soapP.value = "Recommended treatment is a composite filling to remove decay and restore tooth. Patient consents to the treatment plan. Procedure scheduled.";
-            }
-
-            recordBtn.addEventListener('click', () => {
-                appState.isRecording = !appState.isRecording;
-                if (appState.isRecording) {
-                    recordStatusEl.textContent = 'Recording...';
-                    recordBtn.classList.add('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
-                    recordBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800');
-                    recordIconContainer.innerHTML = stopIcon;
+            function updateProcessingStatus(message, isError = false) {
+                processingStatusEl.textContent = message;
+                if (isError) {
+                    processingStatusEl.classList.add('text-red-600');
                 } else {
-                    recordStatusEl.textContent = 'Processing...';
-                    recordBtn.disabled = true;
-                    simulateProcessing();
+                    processingStatusEl.classList.remove('text-red-600');
                 }
-            });
+            }
+            
+            function blobToBase64(blob) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                });
+            }
 
-            startOverBtn.addEventListener('click', () => {
+            async function processRecording() {
+                switchStep('processing');
+                const apiKey = apiKeyInput.value;
+
+                if (!apiKey) {
+                    updateProcessingStatus('API Key is missing. Please enter your key and try again.', true);
+                    setTimeout(() => startOver(), 4000);
+                    return;
+                }
+                
+                try {
+                    // 1. Convert audio to Base64
+                    updateProcessingStatus('Preparing audio...');
+                    const audioBase64 = await blobToBase64(appState.audioBlob);
+                    
+                    // 2. Transcribe Audio using inline data
+                    updateProcessingStatus('Transcribing with AI...');
+                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                    const transcribePayload = {
+                        contents: [{
+                            parts: [
+                                { text: "Transcribe this audio of a dental consultation. Identify the speakers as 'Dentist' and 'Patient'." },
+                                { inlineData: { mimeType: "audio/wav", data: audioBase64 } }
+                            ]
+                        }]
+                    };
+                    const transcribeResponse = await fetch(transcribeUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(transcribePayload)
+                    });
+                    
+                    if (!transcribeResponse.ok) {
+                        const errorBody = await transcribeResponse.json().catch(() => ({ error: { message: transcribeResponse.statusText } }));
+                        let errorMessage = errorBody.error?.message || transcribeResponse.statusText;
+                        if (transcribeResponse.status === 400 && errorMessage.includes("API key not valid")) {
+                           errorMessage = "API Key not valid. Please check the key and ensure the Generative Language API is enabled in your Google Cloud project.";
+                        } else {
+                           errorMessage = `Transcription failed (${transcribeResponse.status}): ${errorMessage}`;
+                        }
+                        throw new Error(errorMessage);
+                    }
+                    const transcribeResult = await transcribeResponse.json();
+                    
+                    if (!transcribeResult.candidates || transcribeResult.candidates.length === 0) {
+                        throw new Error("Transcription returned no content. The audio might be silent or too short.");
+                    }
+                    appState.transcript = transcribeResult.candidates[0].content.parts[0].text;
+
+                    // 3. Generate SOAP Notes
+                    updateProcessingStatus('Generating SOAP notes...');
+                    const soapPayload = {
+                        contents: [{
+                            parts: [{ text: `Based on the following transcript, generate a clinical SOAP note as a JSON object with keys "subjective", "objective", "assessment", and "plan".\n\nTranscript:\n${appState.transcript}` }]
+                        }],
+                        generationConfig: { responseMimeType: "application/json" }
+                    };
+                    const soapResponse = await fetch(transcribeUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(soapPayload)
+                    });
+                     if (!soapResponse.ok) {
+                        const errorBody = await soapResponse.json().catch(() => ({ error: { message: soapResponse.statusText } }));
+                        const errorMessage = errorBody.error?.message || soapResponse.statusText;
+                        throw new Error(`SOAP generation failed (${soapResponse.status}): ${errorMessage}`);
+                    }
+                    const soapResult = await soapResponse.json();
+                    const soapNotes = JSON.parse(soapResult.candidates[0].content.parts[0].text);
+
+                    // 4. Populate UI
+                    populateReviewData(appState.transcript, soapNotes);
+                    switchStep('review');
+
+                } catch (error) {
+                    console.error("Processing Error:", error);
+                    updateProcessingStatus(`${error.message}`, true);
+                    setTimeout(() => startOver(), 6000);
+                }
+            }
+
+            function populateReviewData(transcript, soapNotes) {
+                const audioUrl = URL.createObjectURL(appState.audioBlob);
+                audioPlayerContainer.innerHTML = `<audio controls src="${audioUrl}" class="w-full"></audio>`;
+
+                const downloadLink = document.createElement('a');
+                downloadLink.href = audioUrl;
+                downloadLink.download = `dental-recording-${new Date().toISOString()}.wav`;
+                downloadLink.innerHTML = `<button class="w-full text-sm bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition-all font-medium flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download Recording
+                    </button>`;
+                downloadContainer.innerHTML = '';
+                downloadContainer.appendChild(downloadLink);
+
+                const transcriptBlob = new Blob([transcript], { type: 'text/plain;charset=utf-8' });
+                const transcriptUrl = URL.createObjectURL(transcriptBlob);
+                const transcriptDownloadLink = document.createElement('a');
+                transcriptDownloadLink.href = transcriptUrl;
+                transcriptDownloadLink.download = `dental-transcript-${new Date().toISOString()}.txt`;
+                transcriptDownloadLink.innerHTML = `<svg class="w-5 h-5 text-slate-500 hover:text-slate-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>`;
+                transcriptDownloadLink.title = "Download Transcript (.txt)";
+                transcriptDownloadContainer.innerHTML = '';
+                transcriptDownloadContainer.appendChild(transcriptDownloadLink);
+
+                transcriptContainer.innerHTML = transcript.split('\n').map(line => {
+                    if (!line.includes(':')) return `<p class="text-slate-600 text-sm">${line}</p>`;
+                    const [speaker, ...textParts] = line.split(':');
+                    const text = textParts.join(':').trim();
+                    const speakerClass = speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
+                    return `<div>
+                        <p class="font-semibold text-sm ${speakerClass}">${speaker}</p>
+                        <p class="text-slate-600 text-sm">${text}</p>
+                    </div>`;
+                }).join('');
+
+                soapS.value = soapNotes.subjective || "Could not generate.";
+                soapO.value = soapNotes.objective || "Could not generate.";
+                soapA.value = soapNotes.assessment || "Could not generate.";
+                soapP.value = soapNotes.plan || "Could not generate.";
+            }
+            
+            function startOver() {
                 appState.isRecording = false;
+                appState.audioBlob = null;
+                appState.transcript = null;
+                audioPlayerContainer.innerHTML = '';
+                downloadContainer.innerHTML = '';
+                transcriptContainer.innerHTML = '';
+                transcriptDownloadContainer.innerHTML = '';
+                
                 recordStatusEl.textContent = 'Click to Record';
                 recordBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
                 recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
                 recordIconContainer.innerHTML = micIcon;
                 recordBtn.disabled = false;
-                progressBar.style.width = '0%';
-                processingStatusEl.textContent = 'Transcribing audio...';
+                updateProcessingStatus('Initializing...');
                 switchStep('record');
+            }
+
+            recordBtn.addEventListener('click', () => {
+                if (!appState.mediaRecorder) return;
+                
+                appState.isRecording = !appState.isRecording;
+                if (appState.isRecording) {
+                    appState.mediaRecorder.start();
+                    recordStatusEl.textContent = 'Recording...';
+                    recordBtn.classList.add('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
+                    recordBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800');
+                    recordIconContainer.innerHTML = stopIcon;
+                } else {
+                    appState.mediaRecorder.stop();
+                    recordStatusEl.textContent = 'Processing...';
+                    recordBtn.disabled = true;
+                }
             });
+
+            startOverBtn.addEventListener('click', startOver);
             
             copyNoteBtn.addEventListener('click', () => {
-                const fullNote = `Subjective:\n${soapS.value}\n\nObjective:\n${soapO.value}\n\nAssessment:\n${soapA.value}\n\nPlan:\n${soapP.value}`;
+                const fullNote = `Subjective:\n${soapS.value}\n\nObjective:\n${soapO.value}\n\nAssessment:\n${soapA.value}\n\nPlan:\n${soapP.value}\n\n---\n\nFull Transcript:\n${appState.transcript || 'N/A'}`;
                 
                 const dummyTextArea = document.createElement('textarea');
                 dummyTextArea.value = fullNote;
