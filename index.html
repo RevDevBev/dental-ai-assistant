@@ -25,10 +25,10 @@
         .transition-all { transition: all 0.3s ease-in-out; }
         .step-inactive { display: none; }
         .step-active { display: flex; flex-direction: column; align-items: center; }
-        .pulse-red { animation: pulse-red 2s infinite; }
-        @keyframes pulse-red {
-            0%, 100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(220, 38, 38, 0); }
+        .pulse-purple { animation: pulse-purple 2s infinite; }
+        @keyframes pulse-purple {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(168, 85, 247, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(168, 85, 247, 0); }
         }
     </style>
 </head>
@@ -218,7 +218,7 @@
                 appState.isRecording = !appState.isRecording;
                 if (appState.isRecording) {
                     recordStatusEl.textContent = 'Recording...';
-                    recordBtn.classList.add('bg-red-700', 'hover:bg-red-800', 'pulse-red');
+                    recordBtn.classList.add('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
                     recordBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800');
                     recordIconContainer.innerHTML = stopIcon;
                 } else {
@@ -231,7 +231,7 @@
             startOverBtn.addEventListener('click', () => {
                 appState.isRecording = false;
                 recordStatusEl.textContent = 'Click to Record';
-                recordBtn.classList.remove('bg-red-700', 'hover:bg-red-800', 'pulse-red');
+                recordBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
                 recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
                 recordIconContainer.innerHTML = micIcon;
                 recordBtn.disabled = false;
