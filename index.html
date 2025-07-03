@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Dental Note Assistant 1</title>
+    <title>AI Dental Note Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -365,10 +365,10 @@
                     const soapNotes = JSON.parse(soapResult.candidates[0].content.parts[0].text);
                     
                     appState.soapSources = {
-                        subjective: soapNotes.subjective.source,
-                        objective: soapNotes.objective.source,
-                        assessment: soapNotes.assessment.source,
-                        plan: soapNotes.plan.source,
+                        subjective: soapNotes.subjective?.source || [],
+                        objective: soapNotes.objective?.source || [],
+                        assessment: soapNotes.assessment?.source || [],
+                        plan: soapNotes.plan?.source || [],
                     };
 
                     populateReviewData(appState.transcript, soapNotes, audioBlob);
@@ -416,10 +416,10 @@
                     </div>`;
                 }).join('');
 
-                soapS.value = soapNotes.subjective.note || "Could not generate.";
-                soapO.value = soapNotes.objective.note || "Could not generate.";
-                soapA.value = soapNotes.assessment.note || "Could not generate.";
-                soapP.value = soapNotes.plan.note || "Could not generate.";
+                soapS.value = soapNotes.subjective?.note || "Could not generate.";
+                soapO.value = soapNotes.objective?.note || "Could not generate.";
+                soapA.value = soapNotes.assessment?.note || "Could not generate.";
+                soapP.value = soapNotes.plan?.note || "Could not generate.";
             }
             
             function startOver() {
