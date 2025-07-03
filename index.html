@@ -72,6 +72,15 @@
                     </div>
                 </button>
                 <p id="record-status" class="mt-4 text-base font-medium text-slate-600">Waiting for Permission</p>
+                
+                <div class="mt-8 text-center">
+                    <div class="text-slate-400 text-sm font-semibold mb-2">OR</div>
+                    <label for="upload-audio-input" id="upload-label" class="cursor-pointer bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition-all font-medium text-sm inline-flex items-center gap-2">
+                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Upload Audio File
+                    </label>
+                    <input type="file" id="upload-audio-input" class="hidden" accept="audio/*">
+                </div>
             </div>
 
             <!-- Step 2: Processing -->
@@ -147,7 +156,7 @@
             // -----------------------------------------------------------------
             // HARDCODE YOUR API KEY HERE
             // -----------------------------------------------------------------
-            const GEMINI_API_KEY = "AIzaSyAJ_4c8bWtj3sUAPz-jvOI9rzoMxxDzmBE"; 
+            const GEMINI_API_KEY = "YOUR_API_KEY_HERE"; 
             // -----------------------------------------------------------------
 
             const stepRecordEl = document.getElementById('step-record');
@@ -158,6 +167,8 @@
             const recordStatusEl = document.getElementById('record-status');
             const micPermissionStatusEl = document.getElementById('mic-permission-status');
             const recordIconContainer = document.getElementById('record-icon-container');
+            const uploadAudioInput = document.getElementById('upload-audio-input');
+            const uploadLabel = document.getElementById('upload-label');
 
             const processingStatusEl = document.getElementById('processing-status');
 
@@ -189,7 +200,7 @@
                     appState.mediaRecorder.onstop = () => {
                         appState.audioBlob = new Blob(appState.audioChunks, { type: 'audio/wav' });
                         appState.audioChunks = [];
-                        processRecording();
+                        processRecording(appState.audioBlob);
                     };
                     
                     micPermissionStatusEl.textContent = 'Click the microphone to begin the session.';
@@ -197,6 +208,7 @@
                     recordBtn.disabled = false;
                     recordBtn.classList.remove('bg-slate-400', 'cursor-not-allowed');
                     recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
+                    uploadLabel.classList.remove('hidden');
 
                 } catch (err) {
                     console.error("Error accessing microphone:", err);
@@ -235,7 +247,7 @@
                 });
             }
 
-            async function processRecording() {
+            async function processRecording(audioBlob) {
                 switchStep('processing');
                 
                 if (GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
@@ -247,7 +259,7 @@
                 try {
                     // 1. Convert audio to Base64
                     updateProcessingStatus('Preparing audio...');
-                    const audioBase64 = await blobToBase64(appState.audioBlob);
+                    const audioBase64 = await blobToBase64(audioBlob);
                     
                     // 2. Transcribe Audio using inline data
                     updateProcessingStatus('Transcribing with AI...');
@@ -256,7 +268,7 @@
                         contents: [{
                             parts: [
                                 { text: "Transcribe this audio of a dental consultation. Identify the speakers as 'Dentist' and 'Patient'." },
-                                { inlineData: { mimeType: "audio/wav", data: audioBase64 } }
+                                { inlineData: { mimeType: audioBlob.type, data: audioBase64 } }
                             ]
                         }]
                     };
@@ -305,7 +317,7 @@
                     const soapNotes = JSON.parse(soapResult.candidates[0].content.parts[0].text);
 
                     // 4. Populate UI
-                    populateReviewData(appState.transcript, soapNotes);
+                    populateReviewData(appState.transcript, soapNotes, audioBlob);
                     switchStep('review');
 
                 } catch (error) {
@@ -315,8 +327,8 @@
                 }
             }
 
-            function populateReviewData(transcript, soapNotes) {
-                const audioUrl = URL.createObjectURL(appState.audioBlob);
+            function populateReviewData(transcript, soapNotes, audioBlob) {
+                const audioUrl = URL.createObjectURL(audioBlob);
                 audioPlayerContainer.innerHTML = `<audio controls src="${audioUrl}" class="w-full"></audio>`;
 
                 const downloadLink = document.createElement('a');
@@ -364,12 +376,14 @@
                 downloadContainer.innerHTML = '';
                 transcriptContainer.innerHTML = '';
                 transcriptDownloadContainer.innerHTML = '';
+                uploadAudioInput.value = ''; // Reset file input
                 
                 recordStatusEl.textContent = 'Click to Record';
                 recordBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
                 recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
                 recordIconContainer.innerHTML = micIcon;
                 recordBtn.disabled = false;
+                uploadLabel.classList.remove('hidden');
                 updateProcessingStatus('Initializing...');
                 switchStep('record');
             }
@@ -384,10 +398,20 @@
                     recordBtn.classList.add('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
                     recordBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800');
                     recordIconContainer.innerHTML = stopIcon;
+                    uploadLabel.classList.add('hidden');
                 } else {
                     appState.mediaRecorder.stop();
                     recordStatusEl.textContent = 'Processing...';
                     recordBtn.disabled = true;
+                }
+            });
+
+            uploadAudioInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    recordBtn.disabled = true;
+                    uploadLabel.classList.add('hidden');
+                    processRecording(file);
                 }
             });
 
