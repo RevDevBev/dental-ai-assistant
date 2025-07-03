@@ -42,6 +42,27 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .tooltip {
+            position: absolute;
+            display: none;
+            background-color: #1f2937; /* gray-800 */
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            z-index: 10;
+            width: max-content;
+            max-width: 300px;
+            font-size: 0.875rem;
+            line-height: 1.25rem;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+        }
+        .tooltip-source {
+            font-style: italic;
+            color: #9ca3af; /* gray-400 */
+            border-left: 2px solid #4f46e5; /* indigo-600 */
+            padding-left: 8px;
+            margin-top: 4px;
+        }
     </style>
 </head>
 <body class="text-slate-800">
@@ -103,19 +124,39 @@
                         <!-- Left: SOAP Note -->
                         <div class="lg:col-span-3 space-y-4">
                             <div>
-                                <label for="soap-s" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Subjective</label>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <label for="soap-s" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Subjective</label>
+                                    <div class="info-icon" data-target="subjective">
+                                        <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </div>
+                                </div>
                                 <textarea id="soap-s" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                             <div>
-                                <label for="soap-o" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Objective</label>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <label for="soap-o" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Objective</label>
+                                    <div class="info-icon" data-target="objective">
+                                        <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </div>
+                                </div>
                                 <textarea id="soap-o" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                             <div>
-                                <label for="soap-a" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Assessment</label>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <label for="soap-a" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Assessment</label>
+                                    <div class="info-icon" data-target="assessment">
+                                        <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </div>
+                                </div>
                                 <textarea id="soap-a" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                             <div>
-                                <label for="soap-p" class="block text-xs font-semibold text-slate-600 mb-1 uppercase tracking-wider">Plan</label>
+                                <div class="flex items-center gap-2 mb-1">
+                                    <label for="soap-p" class="block text-xs font-semibold text-slate-600 uppercase tracking-wider">Plan</label>
+                                    <div class="info-icon" data-target="plan">
+                                        <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                                    </div>
+                                </div>
                                 <textarea id="soap-p" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                              <div class="flex justify-end gap-3 items-center">
@@ -140,6 +181,7 @@
                 </div>
             </div>
         </main>
+        <div id="tooltip" class="tooltip"></div>
     </div>
 
     <script>
@@ -151,6 +193,7 @@
                 audioChunks: [],
                 audioBlob: null,
                 transcript: null,
+                soapSources: {},
             };
 
             // -----------------------------------------------------------------
@@ -180,6 +223,7 @@
             const soapO = document.getElementById('soap-o');
             const soapA = document.getElementById('soap-a');
             const soapP = document.getElementById('soap-p');
+            const tooltip = document.getElementById('tooltip');
 
             const startOverBtn = document.getElementById('start-over-btn');
             const copyNoteBtn = document.getElementById('copy-note-btn');
@@ -257,11 +301,9 @@
                 }
                 
                 try {
-                    // 1. Convert audio to Base64
                     updateProcessingStatus('Preparing audio...');
                     const audioBase64 = await blobToBase64(audioBlob);
                     
-                    // 2. Transcribe Audio using inline data
                     updateProcessingStatus('Transcribing with AI...');
                     const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
                     const transcribePayload = {
@@ -295,12 +337,18 @@
                     }
                     appState.transcript = transcribeResult.candidates[0].content.parts[0].text;
 
-                    // 3. Generate SOAP Notes
-                    updateProcessingStatus('Generating SOAP notes...');
+                    updateProcessingStatus('Generating SOAP notes with citations...');
+                    const soapPrompt = `Based on the following transcript, generate a clinical SOAP note.
+                    The output must be a single JSON object.
+                    For each section (subjective, objective, assessment, plan), provide two keys:
+                    1. "note": A string containing the summarized note for that section.
+                    2. "source": An array of strings, where each string is an exact quote from the transcript that justifies the note.
+                    
+                    Transcript:
+                    ${appState.transcript}`;
+                    
                     const soapPayload = {
-                        contents: [{
-                            parts: [{ text: `Based on the following transcript, generate a clinical SOAP note as a JSON object with keys "subjective", "objective", "assessment", and "plan".\n\nTranscript:\n${appState.transcript}` }]
-                        }],
+                        contents: [{ parts: [{ text: soapPrompt }] }],
                         generationConfig: { responseMimeType: "application/json" }
                     };
                     const soapResponse = await fetch(transcribeUrl, {
@@ -315,8 +363,14 @@
                     }
                     const soapResult = await soapResponse.json();
                     const soapNotes = JSON.parse(soapResult.candidates[0].content.parts[0].text);
+                    
+                    appState.soapSources = {
+                        subjective: soapNotes.subjective.source,
+                        objective: soapNotes.objective.source,
+                        assessment: soapNotes.assessment.source,
+                        plan: soapNotes.plan.source,
+                    };
 
-                    // 4. Populate UI
                     populateReviewData(appState.transcript, soapNotes, audioBlob);
                     switchStep('review');
 
@@ -362,16 +416,17 @@
                     </div>`;
                 }).join('');
 
-                soapS.value = soapNotes.subjective || "Could not generate.";
-                soapO.value = soapNotes.objective || "Could not generate.";
-                soapA.value = soapNotes.assessment || "Could not generate.";
-                soapP.value = soapNotes.plan || "Could not generate.";
+                soapS.value = soapNotes.subjective.note || "Could not generate.";
+                soapO.value = soapNotes.objective.note || "Could not generate.";
+                soapA.value = soapNotes.assessment.note || "Could not generate.";
+                soapP.value = soapNotes.plan.note || "Could not generate.";
             }
             
             function startOver() {
                 appState.isRecording = false;
                 appState.audioBlob = null;
                 appState.transcript = null;
+                appState.soapSources = {};
                 audioPlayerContainer.innerHTML = '';
                 downloadContainer.innerHTML = '';
                 transcriptContainer.innerHTML = '';
@@ -432,6 +487,23 @@
                     console.error('Failed to copy text: ', err);
                 }
                 document.body.removeChild(dummyTextArea);
+            });
+
+            document.querySelectorAll('.info-icon').forEach(icon => {
+                icon.addEventListener('mouseenter', (e) => {
+                    const target = e.currentTarget.dataset.target;
+                    const sources = appState.soapSources[target];
+                    if (sources && sources.length > 0) {
+                        tooltip.innerHTML = '<strong>Source from transcript:</strong>' + sources.map(s => `<div class="tooltip-source">"${s}"</div>`).join('');
+                        tooltip.style.display = 'block';
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        tooltip.style.left = `${rect.right + 10}px`;
+                        tooltip.style.top = `${rect.top}px`;
+                    }
+                });
+                icon.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
             });
 
         });
