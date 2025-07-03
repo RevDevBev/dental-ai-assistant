@@ -59,13 +59,6 @@
             <p class="text-slate-500">A modern assistant to streamline your clinical documentation.</p>
         </header>
 
-        <!-- API Key Input -->
-        <div class="mb-6 max-w-2xl mx-auto">
-            <label for="api-key-input" class="block text-sm font-medium text-gray-700 mb-1">Gemini API Key</label>
-            <input type="password" id="api-key-input" class="w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500" placeholder="Enter your key to enable AI features">
-            <p class="text-xs text-gray-500 mt-1">Your key is used only in your browser and is not stored.</p>
-        </div>
-
         <!-- Main Content Area -->
         <main class="bg-white rounded-lg shadow-sm border border-slate-200 min-h-[60vh] flex items-center justify-center p-6 md:p-8">
 
@@ -151,7 +144,11 @@
                 transcript: null,
             };
 
-            const apiKeyInput = document.getElementById('api-key-input');
+            // -----------------------------------------------------------------
+            // HARDCODE YOUR API KEY HERE
+            // -----------------------------------------------------------------
+            const GEMINI_API_KEY = "AIzaSyAJ_4c8bWtj3sUAPz-jvOI9rzoMxxDzmBE"; 
+            // -----------------------------------------------------------------
 
             const stepRecordEl = document.getElementById('step-record');
             const stepProcessingEl = document.getElementById('step-processing');
@@ -240,10 +237,9 @@
 
             async function processRecording() {
                 switchStep('processing');
-                const apiKey = apiKeyInput.value;
-
-                if (!apiKey) {
-                    updateProcessingStatus('API Key is missing. Please enter your key and try again.', true);
+                
+                if (GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
+                    updateProcessingStatus('API Key is not set. Please hardcode your key in the script.', true);
                     setTimeout(() => startOver(), 4000);
                     return;
                 }
@@ -255,7 +251,7 @@
                     
                     // 2. Transcribe Audio using inline data
                     updateProcessingStatus('Transcribing with AI...');
-                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
                     const transcribePayload = {
                         contents: [{
                             parts: [
