@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Dental Note Assistant</title>
+    <title>AI Dental Note Assistant1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -338,14 +338,34 @@
                     appState.transcript = transcribeResult.candidates[0].content.parts[0].text;
 
                     updateProcessingStatus('Generating SOAP notes with citations...');
-                    const soapPrompt = `Based on the following transcript, generate a clinical SOAP note.
-                    The output must be a single JSON object.
-                    For each section (subjective, objective, assessment, plan), provide two keys:
-                    1. "note": A string containing the summarized note for that section.
-                    2. "source": An array of strings, where each string is an exact quote from the transcript that justifies the note.
-                    
-                    Transcript:
-                    ${appState.transcript}`;
+                    const soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
+
+The output MUST be a single, valid JSON object that adheres to the following structure:
+{
+  "subjective": {
+    "note": "A summary of the patient's reported symptoms and feelings.",
+    "source": ["An array of exact quotes from the transcript supporting the subjective note."]
+  },
+  "objective": {
+    "note": "A summary of the dentist's objective findings and observations.",
+    "source": ["An array of exact quotes from the transcript supporting the objective note."]
+  },
+  "assessment": {
+    "note": "The dentist's diagnosis or assessment of the situation.",
+    "source": ["An array of exact quotes from the transcript supporting the assessment."]
+  },
+  "plan": {
+    "note": "The proposed treatment plan, prescriptions, or follow-up actions.",
+    "source": ["An array of exact quotes from the transcript supporting the plan."]
+  }
+}
+
+If a section cannot be determined from the transcript, provide an empty string for the "note" and an empty array for the "source". Do not omit any keys.
+
+Here is the transcript to analyze:
+---
+${appState.transcript}
+---`;
                     
                     const soapPayload = {
                         contents: [{ parts: [{ text: soapPrompt }] }],
