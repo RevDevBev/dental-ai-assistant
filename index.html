@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Dental Note Assistant 1</title>
+    <title>AI Dental Note Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -202,7 +202,6 @@
                 audioChunks: [],
                 audioBlob: null,
                 transcript: null,
-                structuredTranscript: [],
                 soapSources: {},
             };
 
@@ -315,28 +314,14 @@
                     const audioBase64 = await blobToBase64(audioBlob);
                     
                     updateProcessingStatus('Transcribing with AI...');
-                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-                    const transcribePrompt = `You are an expert transcriptionist. Transcribe the following audio of a dental consultation.
-The output MUST be a single, valid JSON array.
-Each object in the array should represent a single utterance and have three keys:
-1. "speaker": A string, either "Dentist" or "Patient".
-2. "text": A string containing the transcribed text of the utterance.
-3. "timestamp": A number representing the start time of the utterance in seconds.
-
-Example:
-[
-  { "speaker": "Dentist", "text": "Good morning, how can I help?", "timestamp": 1.2 },
-  { "speaker": "Patient", "text": "I have a toothache.", "timestamp": 3.5 }
-]`;
-
+                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
                     const transcribePayload = {
                         contents: [{
                             parts: [
-                                { text: transcribePrompt },
+                                { text: "Transcribe this audio of a dental consultation. Identify the speakers as 'Dentist' and 'Patient'." },
                                 { inlineData: { mimeType: audioBlob.type, data: audioBase64 } }
                             ]
-                        }],
-                        generationConfig: { responseMimeType: "application/json" }
+                        }]
                     };
                     const transcribeResponse = await fetch(transcribeUrl, {
                         method: 'POST',
@@ -359,9 +344,7 @@ Example:
                     if (!transcribeResult.candidates || transcribeResult.candidates.length === 0) {
                         throw new Error("Transcription returned no content. The audio might be silent or too short.");
                     }
-                    appState.structuredTranscript = JSON.parse(transcribeResult.candidates[0].content.parts[0].text);
-                    appState.transcript = appState.structuredTranscript.map(line => `${line.speaker}: ${line.text}`).join('\n');
-
+                    appState.transcript = transcribeResult.candidates[0].content.parts[0].text;
 
                     updateProcessingStatus('Generating SOAP notes with citations...');
                     const soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
@@ -417,7 +400,7 @@ ${appState.transcript}
                         plan: soapNotes.plan?.source || [],
                     };
 
-                    populateReviewData(appState.structuredTranscript, soapNotes, audioBlob);
+                    populateReviewData(appState.transcript, soapNotes, audioBlob);
                     switchStep('review');
 
                 } catch (error) {
@@ -426,14 +409,8 @@ ${appState.transcript}
                     setTimeout(() => startOver(), 6000);
                 }
             }
-            
-            function formatTimestamp(seconds) {
-                const minutes = Math.floor(seconds / 60);
-                const remainingSeconds = Math.floor(seconds % 60);
-                return `[${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}]`;
-            }
 
-            function populateReviewData(structuredTranscript, soapNotes, audioBlob) {
+            function populateReviewData(transcript, soapNotes, audioBlob) {
                 const audioUrl = URL.createObjectURL(audioBlob);
                 audioPlayerContainer.innerHTML = `<audio controls src="${audioUrl}" class="w-full"></audio>`;
 
@@ -447,8 +424,7 @@ ${appState.transcript}
                 downloadContainer.innerHTML = '';
                 downloadContainer.appendChild(downloadLink);
 
-                const plainTranscript = structuredTranscript.map(line => `${formatTimestamp(line.timestamp)} ${line.speaker}: ${line.text}`).join('\n');
-                const transcriptBlob = new Blob([plainTranscript], { type: 'text/plain;charset=utf-8' });
+                const transcriptBlob = new Blob([transcript], { type: 'text/plain;charset=utf-8' });
                 const transcriptUrl = URL.createObjectURL(transcriptBlob);
                 const transcriptDownloadLink = document.createElement('a');
                 transcriptDownloadLink.href = transcriptUrl;
@@ -458,15 +434,14 @@ ${appState.transcript}
                 transcriptDownloadContainer.innerHTML = '';
                 transcriptDownloadContainer.appendChild(transcriptDownloadLink);
 
-                transcriptContainer.innerHTML = structuredTranscript.map(line => {
-                    const speakerClass = line.speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
-                    const fullText = `${line.speaker}: ${line.text}`;
-                    return `<div class="transcript-line" data-text="${fullText}">
-                        <p class="font-semibold text-sm ${speakerClass}">
-                            <span class="text-slate-400 font-mono text-xs">${formatTimestamp(line.timestamp)}</span>
-                            ${line.speaker}
-                        </p>
-                        <p class="text-slate-600 text-sm pl-12">${line.text}</p>
+                transcriptContainer.innerHTML = transcript.split('\n').map(line => {
+                    if (!line.includes(':')) return `<div class="transcript-line"><p class="text-slate-600 text-sm">${line}</p></div>`;
+                    const [speaker, ...textParts] = line.split(':');
+                    const text = textParts.join(':').trim();
+                    const speakerClass = speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
+                    return `<div class="transcript-line">
+                        <p class="font-semibold text-sm ${speakerClass}">${speaker}</p>
+                        <p class="text-slate-600 text-sm">${text}</p>
                     </div>`;
                 }).join('');
 
@@ -480,7 +455,6 @@ ${appState.transcript}
                 appState.isRecording = false;
                 appState.audioBlob = null;
                 appState.transcript = null;
-                appState.structuredTranscript = [];
                 appState.soapSources = {};
                 audioPlayerContainer.innerHTML = '';
                 downloadContainer.innerHTML = '';
@@ -568,7 +542,7 @@ ${appState.transcript}
                     
                     document.querySelectorAll('.transcript-line').forEach(line => {
                         line.classList.remove('transcript-highlight');
-                        const lineText = line.dataset.text;
+                        const lineText = line.innerText || line.textContent;
                         if (sources && sources.some(source => lineText.includes(source))) {
                             line.classList.add('transcript-highlight');
                         }
