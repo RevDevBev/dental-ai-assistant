@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Dental Note Assistant1</title>
+    <title>AI Dental Note Assistant</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -62,6 +62,15 @@
             border-left: 2px solid #4f46e5; /* indigo-600 */
             padding-left: 8px;
             margin-top: 4px;
+        }
+        .transcript-line {
+            padding: 2px 4px;
+            border-radius: 3px;
+            transition: background-color 0.3s;
+        }
+        .transcript-highlight {
+            background-color: #fef3c7; /* amber-100 */
+            border-radius: 3px;
         }
     </style>
 </head>
@@ -130,7 +139,7 @@
                                         <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </div>
                                 </div>
-                                <textarea id="soap-s" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                                <textarea id="soap-s" data-section="subjective" rows="5" class="soap-input w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
@@ -139,7 +148,7 @@
                                         <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </div>
                                 </div>
-                                <textarea id="soap-o" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                                <textarea id="soap-o" data-section="objective" rows="5" class="soap-input w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
@@ -148,7 +157,7 @@
                                         <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </div>
                                 </div>
-                                <textarea id="soap-a" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                                <textarea id="soap-a" data-section="assessment" rows="5" class="soap-input w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
@@ -157,7 +166,7 @@
                                         <svg class="w-4 h-4 text-slate-400 cursor-pointer" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                                     </div>
                                 </div>
-                                <textarea id="soap-p" rows="5" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
+                                <textarea id="soap-p" data-section="plan" rows="5" class="soap-input w-full p-2.5 bg-slate-50 border border-slate-200 rounded-md focus:ring-2 focus:ring-amber-500 focus:border-amber-500"></textarea>
                             </div>
                              <div class="flex justify-end gap-3 items-center">
                                 <span id="copy-success-msg" class="text-amber-600 font-medium text-sm hidden">Note Copied!</span>
@@ -426,11 +435,11 @@ ${appState.transcript}
                 transcriptDownloadContainer.appendChild(transcriptDownloadLink);
 
                 transcriptContainer.innerHTML = transcript.split('\n').map(line => {
-                    if (!line.includes(':')) return `<p class="text-slate-600 text-sm">${line}</p>`;
+                    if (!line.includes(':')) return `<div class="transcript-line"><p class="text-slate-600 text-sm">${line}</p></div>`;
                     const [speaker, ...textParts] = line.split(':');
                     const text = textParts.join(':').trim();
                     const speakerClass = speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
-                    return `<div>
+                    return `<div class="transcript-line">
                         <p class="font-semibold text-sm ${speakerClass}">${speaker}</p>
                         <p class="text-slate-600 text-sm">${text}</p>
                     </div>`;
@@ -523,6 +532,21 @@ ${appState.transcript}
                 });
                 icon.addEventListener('mouseleave', () => {
                     tooltip.style.display = 'none';
+                });
+            });
+
+            document.querySelectorAll('.soap-input').forEach(input => {
+                input.addEventListener('focus', (e) => {
+                    const section = e.currentTarget.dataset.section;
+                    const sources = appState.soapSources[section];
+                    
+                    document.querySelectorAll('.transcript-line').forEach(line => {
+                        line.classList.remove('transcript-highlight');
+                        const lineText = line.innerText || line.textContent;
+                        if (sources && sources.some(source => lineText.includes(source))) {
+                            line.classList.add('transcript-highlight');
+                        }
+                    });
                 });
             });
 
