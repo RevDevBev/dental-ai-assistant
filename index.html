@@ -103,8 +103,14 @@
                 </button>
                 <p id="record-status" class="mt-4 text-base font-medium text-slate-600">Waiting for Permission</p>
                 
-                <div class="mt-8 text-center">
-                    <div class="text-slate-400 text-sm font-semibold mb-2">OR</div>
+                <div class="mt-8 text-center border-t pt-6 w-full max-w-md mx-auto">
+                    <label for="template-upload-input" id="template-upload-label" class="cursor-pointer bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-100 transition-all font-medium text-sm inline-flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Upload Note Template (Optional)
+                    </label>
+                    <input type="file" id="template-upload-input" class="hidden" accept=".txt">
+                    <p id="template-status" class="text-xs text-slate-500 mt-2"></p>
+                    <div class="text-slate-400 text-sm font-semibold my-2">OR</div>
                     <label for="upload-audio-input" id="upload-label" class="cursor-pointer bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition-all font-medium text-sm inline-flex items-center gap-2">
                          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         Upload Audio File
@@ -202,7 +208,9 @@
                 audioChunks: [],
                 audioBlob: null,
                 transcript: null,
+                structuredTranscript: [],
                 soapSources: {},
+                noteTemplate: null,
             };
 
             // -----------------------------------------------------------------
@@ -221,6 +229,8 @@
             const recordIconContainer = document.getElementById('record-icon-container');
             const uploadAudioInput = document.getElementById('upload-audio-input');
             const uploadLabel = document.getElementById('upload-label');
+            const templateUploadInput = document.getElementById('template-upload-input');
+            const templateStatus = document.getElementById('template-status');
 
             const processingStatusEl = document.getElementById('processing-status');
 
@@ -315,13 +325,27 @@
                     
                     updateProcessingStatus('Transcribing with AI...');
                     const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+                    const transcribePrompt = `You are an expert transcriptionist. Transcribe the following audio of a dental consultation.
+The output MUST be a single, valid JSON array.
+Each object in the array should represent a single utterance and have three keys:
+1. "speaker": A string, either "Dentist" or "Patient".
+2. "text": A string containing the transcribed text of the utterance.
+3. "timestamp": A number representing the start time of the utterance in seconds.
+
+Example:
+[
+  { "speaker": "Dentist", "text": "Good morning, how can I help?", "timestamp": 1.2 },
+  { "speaker": "Patient", "text": "I have a toothache.", "timestamp": 3.5 }
+]`;
+
                     const transcribePayload = {
                         contents: [{
                             parts: [
-                                { text: "Transcribe this audio of a dental consultation. Identify the speakers as 'Dentist' and 'Patient'." },
+                                { text: transcribePrompt },
                                 { inlineData: { mimeType: audioBlob.type, data: audioBase64 } }
                             ]
-                        }]
+                        }],
+                        generationConfig: { responseMimeType: "application/json" }
                     };
                     const transcribeResponse = await fetch(transcribeUrl, {
                         method: 'POST',
@@ -344,37 +368,48 @@
                     if (!transcribeResult.candidates || transcribeResult.candidates.length === 0) {
                         throw new Error("Transcription returned no content. The audio might be silent or too short.");
                     }
-                    appState.transcript = transcribeResult.candidates[0].content.parts[0].text;
+                    appState.structuredTranscript = JSON.parse(transcribeResult.candidates[0].content.parts[0].text);
+                    appState.transcript = appState.structuredTranscript.map(line => `${line.speaker}: ${line.text}`).join('\n');
+
 
                     updateProcessingStatus('Generating SOAP notes with citations...');
-                    const soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
-
+                    
+                    let soapPrompt;
+                    if (appState.noteTemplate) {
+                        soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
+You MUST follow the style and structure of the provided template.
 The output MUST be a single, valid JSON object that adheres to the following structure:
 {
-  "subjective": {
-    "note": "A summary of the patient's reported symptoms and feelings.",
-    "source": ["An array of exact quotes from the transcript supporting the subjective note."]
-  },
-  "objective": {
-    "note": "A summary of the dentist's objective findings and observations.",
-    "source": ["An array of exact quotes from the transcript supporting the objective note."]
-  },
-  "assessment": {
-    "note": "The dentist's diagnosis or assessment of the situation.",
-    "source": ["An array of exact quotes from the transcript supporting the assessment."]
-  },
-  "plan": {
-    "note": "The proposed treatment plan, prescriptions, or follow-up actions.",
-    "source": ["An array of exact quotes from the transcript supporting the plan."]
-  }
+  "subjective": { "note": "...", "source": ["..."] },
+  "objective": { "note": "...", "source": ["..."] },
+  "assessment": { "note": "...", "source": ["..."] },
+  "plan": { "note": "...", "source": ["..."] }
 }
 
-If a section cannot be determined from the transcript, provide an empty string for the "note" and an empty array for the "source". Do not omit any keys.
+Template to follow:
+---
+${appState.noteTemplate}
+---
 
-Here is the transcript to analyze:
+Transcript to analyze:
 ---
 ${appState.transcript}
 ---`;
+                    } else {
+                        soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
+The output MUST be a single, valid JSON object that adheres to the following structure:
+{
+  "subjective": { "note": "A summary of the patient's reported symptoms and feelings.", "source": ["An array of exact quotes from the transcript supporting the subjective note."] },
+  "objective": { "note": "A summary of the dentist's objective findings and observations.", "source": ["An array of exact quotes from the transcript supporting the objective note."] },
+  "assessment": { "note": "The dentist's diagnosis or assessment of the situation.", "source": ["An array of exact quotes from the transcript supporting the assessment."] },
+  "plan": { "note": "The proposed treatment plan, prescriptions, or follow-up actions.", "source": ["An array of exact quotes from the transcript supporting the plan."] }
+}
+If a section cannot be determined from the transcript, provide an empty string for the "note" and an empty array for the "source". Do not omit any keys.
+Transcript to analyze:
+---
+${appState.transcript}
+---`;
+                    }
                     
                     const soapPayload = {
                         contents: [{ parts: [{ text: soapPrompt }] }],
@@ -400,7 +435,7 @@ ${appState.transcript}
                         plan: soapNotes.plan?.source || [],
                     };
 
-                    populateReviewData(appState.transcript, soapNotes, audioBlob);
+                    populateReviewData(appState.structuredTranscript, soapNotes, audioBlob);
                     switchStep('review');
 
                 } catch (error) {
@@ -409,8 +444,17 @@ ${appState.transcript}
                     setTimeout(() => startOver(), 6000);
                 }
             }
+            
+            function formatTimestamp(seconds) {
+                if (typeof seconds !== 'number' || isNaN(seconds)) {
+                    return '[--:--]';
+                }
+                const minutes = Math.floor(seconds / 60);
+                const remainingSeconds = Math.floor(seconds % 60);
+                return `[${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}]`;
+            }
 
-            function populateReviewData(transcript, soapNotes, audioBlob) {
+            function populateReviewData(structuredTranscript, soapNotes, audioBlob) {
                 const audioUrl = URL.createObjectURL(audioBlob);
                 audioPlayerContainer.innerHTML = `<audio controls src="${audioUrl}" class="w-full"></audio>`;
 
@@ -424,7 +468,8 @@ ${appState.transcript}
                 downloadContainer.innerHTML = '';
                 downloadContainer.appendChild(downloadLink);
 
-                const transcriptBlob = new Blob([transcript], { type: 'text/plain;charset=utf-8' });
+                const plainTranscript = structuredTranscript.map(line => `${formatTimestamp(line.timestamp)} ${line.speaker}: ${line.text}`).join('\n');
+                const transcriptBlob = new Blob([plainTranscript], { type: 'text/plain;charset=utf-8' });
                 const transcriptUrl = URL.createObjectURL(transcriptBlob);
                 const transcriptDownloadLink = document.createElement('a');
                 transcriptDownloadLink.href = transcriptUrl;
@@ -434,14 +479,15 @@ ${appState.transcript}
                 transcriptDownloadContainer.innerHTML = '';
                 transcriptDownloadContainer.appendChild(transcriptDownloadLink);
 
-                transcriptContainer.innerHTML = transcript.split('\n').map(line => {
-                    if (!line.includes(':')) return `<div class="transcript-line"><p class="text-slate-600 text-sm">${line}</p></div>`;
-                    const [speaker, ...textParts] = line.split(':');
-                    const text = textParts.join(':').trim();
-                    const speakerClass = speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
-                    return `<div class="transcript-line">
-                        <p class="font-semibold text-sm ${speakerClass}">${speaker}</p>
-                        <p class="text-slate-600 text-sm">${text}</p>
+                transcriptContainer.innerHTML = structuredTranscript.map(line => {
+                    const speakerClass = line.speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
+                    const fullText = `${line.speaker}: ${line.text}`;
+                    return `<div class="transcript-line" data-text="${fullText}">
+                        <p class="font-semibold text-sm ${speakerClass}">
+                            <span class="text-slate-400 font-mono text-xs">${formatTimestamp(line.timestamp)}</span>
+                            ${line.speaker}
+                        </p>
+                        <p class="text-slate-600 text-sm pl-12">${line.text}</p>
                     </div>`;
                 }).join('');
 
@@ -455,12 +501,16 @@ ${appState.transcript}
                 appState.isRecording = false;
                 appState.audioBlob = null;
                 appState.transcript = null;
+                appState.structuredTranscript = [];
                 appState.soapSources = {};
+                appState.noteTemplate = null;
                 audioPlayerContainer.innerHTML = '';
                 downloadContainer.innerHTML = '';
                 transcriptContainer.innerHTML = '';
                 transcriptDownloadContainer.innerHTML = '';
-                uploadAudioInput.value = ''; // Reset file input
+                uploadAudioInput.value = '';
+                templateUploadInput.value = '';
+                templateStatus.textContent = '';
                 
                 recordStatusEl.textContent = 'Click to Record';
                 recordBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
@@ -496,6 +546,19 @@ ${appState.transcript}
                     recordBtn.disabled = true;
                     uploadLabel.classList.add('hidden');
                     processRecording(file);
+                }
+            });
+            
+            templateUploadInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        appState.noteTemplate = e.target.result;
+                        templateStatus.textContent = `Template "${file.name}" loaded.`;
+                        templateStatus.classList.add('text-green-600');
+                    };
+                    reader.readAsText(file);
                 }
             });
 
@@ -542,7 +605,7 @@ ${appState.transcript}
                     
                     document.querySelectorAll('.transcript-line').forEach(line => {
                         line.classList.remove('transcript-highlight');
-                        const lineText = line.innerText || line.textContent;
+                        const lineText = line.dataset.text;
                         if (sources && sources.some(source => lineText.includes(source))) {
                             line.classList.add('transcript-highlight');
                         }
