@@ -376,25 +376,28 @@ Example:
                     
                     let soapPrompt;
                     if (appState.noteTemplate) {
-                        soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
-You MUST follow the style and structure of the provided template.
-The output MUST be a single, valid JSON object that adheres to the following structure:
+                        soapPrompt = `You are a medical note generation assistant. Your primary task is to extract information from a transcript and structure it into a JSON object.
+You have been provided with a user's preferred note-taking template. Use this template as a stylistic guide for the content you generate for the "note" fields. The final output must still be the JSON object.
+
+**User's Note Template (for style reference):**
+---
+${appState.noteTemplate}
+---
+
+**Transcript to Analyze:**
+---
+${appState.transcript}
+---
+
+**Required JSON Output Structure:**
+Generate a single, valid JSON object with the following keys. For each key, create a "note" that reflects the style of the user's template and a "source" array with exact quotes from the transcript.
 {
   "subjective": { "note": "...", "source": ["..."] },
   "objective": { "note": "...", "source": ["..."] },
   "assessment": { "note": "...", "source": ["..."] },
   "plan": { "note": "...", "source": ["..."] }
 }
-
-Template to follow:
----
-${appState.noteTemplate}
----
-
-Transcript to analyze:
----
-${appState.transcript}
----`;
+If a section cannot be determined, provide an empty string for the "note" and an empty array for the "source".`;
                     } else {
                         soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
 The output MUST be a single, valid JSON object that adheres to the following structure:
