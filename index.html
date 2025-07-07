@@ -3,23 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Dental Note Assistant</title>
+    <title>AI Dental Note Assistant (Vertex AI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <!-- Chosen Palette: Modern Slate & Amber -->
-    <!-- Application Structure Plan: A task-oriented, multi-step single-page application that guides the user through a linear workflow: 1) Record Audio, 2) Analyze Conversation, and 3) Review & Finalize Note. This structure was chosen because it mirrors the natural, real-world process a clinician follows, making the application intuitive and easy to use. The UI will dynamically transition between these three states, presenting only the relevant information and actions for each step, which minimizes cognitive load and prevents user error. -->
-    <!-- Visualization & Content Choices: 
-        - Report Info: Conversation Transcript -> Goal: Organize/Inform -> Viz/Method: A styled list presenting diarized (speaker-labeled) text in a dedicated, scrollable panel. -> Interaction: Scrollable display. -> Justification: This is the most direct and universally understood way to present a conversation log, making it easy for the dentist to reference during review.
-        - Report Info: Generated Clinical Note (SOAP) -> Goal: Inform/Organize -> Viz/Method: Four distinct, labeled textarea elements within a form for Subjective, Objective, Assessment, and Plan. -> Interaction: The dentist can directly edit the AI-generated text in each section. -> Justification: Separating the SOAP note into its constituent parts makes it scannable and simplifies editing, which is critical for the human-in-the-loop validation process.
-        - Report Info: Application Status -> Goal: Inform -> Viz/Method: Dynamic text indicators, progress bars, and icon changes (e.g., a "recording" icon). -> Interaction: Automatic updates based on application state. -> Justification: Provides clear, immediate feedback to the user on the system's current process (e.g., "Recording...", "Analyzing...", "Ready for Review"), which builds trust and clarifies what is happening.
-        - Library/Method: All interactions and dynamic content are handled with vanilla JavaScript, manipulating the DOM. No external visualization libraries are needed for this phase.
-    -->
-    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
     <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
+        body {
+            font-family: 'Inter', sans-serif;
             background-color: #f8fafc; /* slate-50 */
         }
         .transition-all { transition: all 0.3s ease-in-out; }
@@ -78,21 +69,18 @@
 
     <div id="app" class="container mx-auto p-4 md:p-6">
 
-        <!-- Header -->
         <header class="mb-6 md:mb-8 text-left">
             <div class="flex items-center gap-3 mb-1">
                  <div class="p-2 bg-slate-200 rounded-lg">
                     <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
                  </div>
-                <h1 class="text-2xl md:text-3xl font-bold text-slate-900">AI Dental Note Assistant</h1>
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-900">AI Dental Note Assistant (Vertex AI)</h1>
             </div>
             <p class="text-slate-500">A modern assistant to streamline your clinical documentation.</p>
         </header>
 
-        <!-- Main Content Area -->
         <main class="bg-white rounded-lg shadow-sm border border-slate-200 min-h-[60vh] flex items-center justify-center p-6 md:p-8">
 
-            <!-- Step 1: Record Audio -->
             <div id="step-record" class="step-active w-full">
                 <h2 class="text-xl font-semibold mb-2 text-slate-700">Ready to Start</h2>
                 <p id="mic-permission-status" class="text-slate-500 mb-8 max-w-md text-center">Requesting microphone access...</p>
@@ -102,7 +90,7 @@
                     </div>
                 </button>
                 <p id="record-status" class="mt-4 text-base font-medium text-slate-600">Waiting for Permission</p>
-                
+
                 <div class="mt-8 text-center border-t pt-6 w-full max-w-md mx-auto">
                     <label for="template-upload-input" id="template-upload-label" class="cursor-pointer bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-100 transition-all font-medium text-sm inline-flex items-center gap-2">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
@@ -119,7 +107,6 @@
                 </div>
             </div>
 
-            <!-- Step 2: Processing -->
             <div id="step-processing" class="step-inactive w-full max-w-lg">
                 <div class="flex items-center justify-center mb-4">
                     <div class="spinner"></div>
@@ -128,7 +115,6 @@
                 <p id="processing-status" class="mt-2 text-base font-medium text-slate-600 text-center">Initializing...</p>
             </div>
 
-            <!-- Step 3: Review Note -->
             <div id="step-review" class="step-inactive !flex-row !items-start w-full">
                 <div class="w-full">
                     <div class="flex justify-between items-center mb-4">
@@ -136,7 +122,6 @@
                         <button id="start-over-btn" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition-all font-medium text-sm">Start New Session</button>
                     </div>
                     <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
-                        <!-- Left: SOAP Note -->
                         <div class="lg:col-span-3 space-y-4">
                             <div>
                                 <div class="flex items-center gap-2 mb-1">
@@ -179,7 +164,6 @@
                                 <button id="copy-note-btn" class="bg-slate-700 text-white px-5 py-2 rounded-md hover:bg-slate-800 transition-all font-semibold focus:outline-none focus:ring-4 focus:ring-slate-300 text-sm">Copy Full Note</button>
                             </div>
                         </div>
-                        <!-- Right: Transcript & Audio Player -->
                         <div class="lg:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200 h-[75vh] flex flex-col">
                             <div class="flex justify-between items-center mb-3">
                                 <h3 class="text-base font-semibold text-slate-800">Session Recording</h3>
@@ -189,8 +173,7 @@
                             <div id="download-container" class="mb-4"></div>
                             <div class="w-full border-t border-slate-200 my-2"></div>
                             <div id="transcript-container" class="overflow-y-auto flex-grow pr-2 space-y-3">
-                                <!-- Transcript will be injected here -->
-                            </div>
+                                </div>
                         </div>
                     </div>
                 </div>
@@ -214,15 +197,24 @@
             };
 
             // -----------------------------------------------------------------
-            // HARDCODE YOUR API KEY HERE
+            // 🚨 VERTEX AI CONFIGURATION - PLEASE FILL THESE OUT 🚨
             // -----------------------------------------------------------------
-            const GEMINI_API_KEY = "AIzaSyAJ_4c8bWtj3sUAPz-jvOI9rzoMxxDzmBE"; 
+            // 1. Get your API Key from the Google Cloud Console.
+            //    Ensure the "Vertex AI API" is enabled for your project.
+            const GOOGLE_API_KEY = "AIzaSyAJ_4c8bWtj3sUAPz-jvOI9rzoMxxDzmBE";
+
+            // 2. Find your Project ID in the Google Cloud Console dashboard.
+            const PROJECT_ID = "gen-lang-client-0435092745";
+
+            // 3. Specify the region for your project (e.g., "us-central1").
+            const LOCATION = "us-central1";
             // -----------------------------------------------------------------
+
 
             const stepRecordEl = document.getElementById('step-record');
             const stepProcessingEl = document.getElementById('step-processing');
             const stepReviewEl = document.getElementById('step-review');
-            
+
             const recordBtn = document.getElementById('record-btn');
             const recordStatusEl = document.getElementById('record-status');
             const micPermissionStatusEl = document.getElementById('mic-permission-status');
@@ -265,7 +257,7 @@
                         appState.audioChunks = [];
                         processRecording(appState.audioBlob);
                     };
-                    
+
                     micPermissionStatusEl.textContent = 'Click the microphone to begin the session.';
                     recordStatusEl.textContent = 'Click to Record';
                     recordBtn.disabled = false;
@@ -300,7 +292,7 @@
                     processingStatusEl.classList.remove('text-red-600');
                 }
             }
-            
+
             function blobToBase64(blob) {
                 return new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -312,19 +304,24 @@
 
             async function processRecording(audioBlob) {
                 switchStep('processing');
-                
-                if (GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
-                    updateProcessingStatus('API Key is not set. Please hardcode your key in the script.', true);
+
+                if (GOOGLE_API_KEY === "YOUR_API_KEY_HERE" || PROJECT_ID === "your-gcp-project-id") {
+                    updateProcessingStatus('API Key or Project ID is not set. Please update the configuration in the script.', true);
                     setTimeout(() => startOver(), 4000);
                     return;
                 }
-                
+
                 try {
                     updateProcessingStatus('Preparing audio...');
                     const audioBase64 = await blobToBase64(audioBlob);
-                    
-                    updateProcessingStatus('Transcribing with AI...');
-                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
+
+                    // --- VERTEX AI API Endpoint ---
+                    const model = 'gemini-1.5-flash-001';
+                    const vertexUrl = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${model}:generateContent`;
+
+
+                    updateProcessingStatus('Transcribing with Vertex AI...');
+
                     const transcribePrompt = `You are a highly accurate audio transcription and analysis system. Your task is to process an audio file of a dental consultation and return a structured transcript.
 
 **CRITICAL INSTRUCTIONS:**
@@ -343,29 +340,35 @@
                         contents: [{
                             parts: [
                                 { text: transcribePrompt },
-                                { inlineData: { mimeType: audioBlob.type, data: audioBase64 } }
+                                { inline_data: { mime_type: audioBlob.type, data: audioBase64 } }
                             ]
                         }],
-                        generationConfig: { responseMimeType: "application/json" }
+                        generation_config: { response_mime_type: "application/json" }
                     };
-                    const transcribeResponse = await fetch(transcribeUrl, {
+
+                    const transcribeResponse = await fetch(vertexUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${GOOGLE_API_KEY}` // Using API Key as Bearer token for this endpoint
+                        },
                         body: JSON.stringify(transcribePayload)
                     });
-                    
+
                     if (!transcribeResponse.ok) {
                         const errorBody = await transcribeResponse.json().catch(() => ({ error: { message: transcribeResponse.statusText } }));
                         let errorMessage = errorBody.error?.message || transcribeResponse.statusText;
-                        if (transcribeResponse.status === 400 && errorMessage.includes("API key not valid")) {
-                           errorMessage = "API Key not valid. Please check the key and ensure the Generative Language API is enabled in your Google Cloud project.";
+                        if (transcribeResponse.status === 403) {
+                           errorMessage = "Vertex AI API has not been used in project or it is disabled. Enable it by visiting the Vertex AI API page in the Google Cloud Console.";
+                        } else if (transcribeResponse.status === 400) {
+                           errorMessage = `Bad Request (${transcribeResponse.status}): ${errorMessage}. Check your Project ID and Region.`;
                         } else {
                            errorMessage = `Transcription failed (${transcribeResponse.status}): ${errorMessage}`;
                         }
                         throw new Error(errorMessage);
                     }
                     const transcribeResult = await transcribeResponse.json();
-                    
+
                     if (!transcribeResult.candidates || transcribeResult.candidates.length === 0) {
                         throw new Error("Transcription returned no content. The audio might be silent or too short.");
                     }
@@ -374,7 +377,7 @@
 
 
                     updateProcessingStatus('Generating SOAP notes with citations...');
-                    
+
                     let soapPrompt;
                     if (appState.noteTemplate) {
                         soapPrompt = `You are a medical note generation assistant. Your primary task is to extract information from a transcript and structure it into a JSON object.
@@ -414,14 +417,17 @@ Transcript to analyze:
 ${appState.transcript}
 ---`;
                     }
-                    
+
                     const soapPayload = {
                         contents: [{ parts: [{ text: soapPrompt }] }],
-                        generationConfig: { responseMimeType: "application/json" }
+                        generation_config: { response_mime_type: "application/json" }
                     };
-                    const soapResponse = await fetch(transcribeUrl, {
+                    const soapResponse = await fetch(vertexUrl, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: {
+                           'Content-Type': 'application/json',
+                           'Authorization': `Bearer ${GOOGLE_API_KEY}`
+                        },
                         body: JSON.stringify(soapPayload)
                     });
                      if (!soapResponse.ok) {
@@ -431,7 +437,7 @@ ${appState.transcript}
                     }
                     const soapResult = await soapResponse.json();
                     const soapNotes = JSON.parse(soapResult.candidates[0].content.parts[0].text);
-                    
+
                     appState.soapSources = {
                         subjective: soapNotes.subjective?.source || [],
                         objective: soapNotes.objective?.source || [],
@@ -448,7 +454,7 @@ ${appState.transcript}
                     setTimeout(() => startOver(), 6000);
                 }
             }
-            
+
             function formatTimestamp(seconds) {
                 if (typeof seconds !== 'number' || isNaN(seconds)) {
                     return '[--:--]';
@@ -500,7 +506,7 @@ ${appState.transcript}
                 soapA.value = soapNotes.assessment?.note || "Could not generate.";
                 soapP.value = soapNotes.plan?.note || "Could not generate.";
             }
-            
+
             function startOver() {
                 appState.isRecording = false;
                 appState.audioBlob = null;
@@ -515,7 +521,7 @@ ${appState.transcript}
                 uploadAudioInput.value = '';
                 templateUploadInput.value = '';
                 templateStatus.textContent = '';
-                
+
                 recordStatusEl.textContent = 'Click to Record';
                 recordBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
                 recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
@@ -528,7 +534,7 @@ ${appState.transcript}
 
             recordBtn.addEventListener('click', () => {
                 if (!appState.mediaRecorder) return;
-                
+
                 appState.isRecording = !appState.isRecording;
                 if (appState.isRecording) {
                     appState.mediaRecorder.start();
@@ -552,7 +558,7 @@ ${appState.transcript}
                     processRecording(file);
                 }
             });
-            
+
             templateUploadInput.addEventListener('change', (event) => {
                 const file = event.target.files[0];
                 if (file) {
@@ -567,10 +573,10 @@ ${appState.transcript}
             });
 
             startOverBtn.addEventListener('click', startOver);
-            
+
             copyNoteBtn.addEventListener('click', () => {
                 const fullNote = `Subjective:\n${soapS.value}\n\nObjective:\n${soapO.value}\n\nAssessment:\n${soapA.value}\n\nPlan:\n${soapP.value}\n\n---\n\nFull Transcript:\n${appState.transcript || 'N/A'}`;
-                
+
                 const dummyTextArea = document.createElement('textarea');
                 dummyTextArea.value = fullNote;
                 document.body.appendChild(dummyTextArea);
@@ -606,7 +612,7 @@ ${appState.transcript}
                 input.addEventListener('focus', (e) => {
                     const section = e.currentTarget.dataset.section;
                     const sources = appState.soapSources[section];
-                    
+
                     document.querySelectorAll('.transcript-line').forEach(line => {
                         line.classList.remove('transcript-highlight');
                         const lineText = line.dataset.text;
