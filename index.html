@@ -325,14 +325,15 @@
                     
                     updateProcessingStatus('Transcribing with AI...');
                     const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-                    const transcribePrompt = `You are an expert transcriptionist. Transcribe the following audio of a dental consultation.
-The output MUST be a single, valid JSON array.
-Each object in the array should represent a single utterance and have three keys:
-1. "speaker": A string, either "Dentist" or "Patient".
-2. "text": A string containing the transcribed text of the utterance.
-3. "timestamp": A number representing the start time of the utterance in seconds.
+                    const transcribePrompt = `You are a highly accurate audio transcription and analysis system. Your task is to process an audio file of a dental consultation and return a structured transcript.
 
-Example:
+**CRITICAL INSTRUCTIONS:**
+1. The output format MUST be a single, valid JSON array.
+2. Each element in the array represents one spoken segment.
+3. Each element MUST contain three keys: "speaker", "text", and "timestamp".
+4. The "timestamp" value MUST be a number representing the start time of the utterance in seconds from the beginning of the audio. This is the most critical part of the output.
+
+**Example of correct output:**
 [
   { "speaker": "Dentist", "text": "Good morning, how can I help?", "timestamp": 1.2 },
   { "speaker": "Patient", "text": "I have a toothache.", "timestamp": 3.5 }
