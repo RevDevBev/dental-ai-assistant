@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Dental Note Assistant (Vertex AI)</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://accounts.google.com/gsi/client" async defer></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -71,24 +70,16 @@
     <div id="app" class="container mx-auto p-4 md:p-6">
 
         <header class="mb-6 md:mb-8 text-left">
-            <div class="flex items-center justify-between">
-                 <div class="flex items-center gap-3 mb-1">
-                    <div class="p-2 bg-slate-200 rounded-lg">
-                        <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
-                    </div>
-                    <h1 class="text-2xl md:text-3xl font-bold text-slate-900">AI Dental Note Assistant (Vertex AI)</h1>
-                </div>
-                <div id="auth-container">
-                    </div>
-                 <div id="user-info" class="hidden items-center gap-3">
-                    <img id="user-avatar" class="w-8 h-8 rounded-full" src="" alt="user avatar">
-                    <button id="sign-out-btn" class="text-sm font-medium text-slate-600 hover:text-slate-900">Sign Out</button>
-                </div>
+            <div class="flex items-center gap-3 mb-1">
+                 <div class="p-2 bg-slate-200 rounded-lg">
+                    <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
+                 </div>
+                <h1 class="text-2xl md:text-3xl font-bold text-slate-900">AI Dental Note Assistant (Vertex AI)</h1>
             </div>
-             <p class="text-slate-500">A modern assistant to streamline your clinical documentation.</p>
+            <p class="text-slate-500">A modern assistant to streamline your clinical documentation.</p>
         </header>
 
-        <main id="main-content" class="bg-white rounded-lg shadow-sm border border-slate-200 min-h-[60vh] flex items-center justify-center p-6 md:p-8 hidden">
+        <main class="bg-white rounded-lg shadow-sm border border-slate-200 min-h-[60vh] flex items-center justify-center p-6 md:p-8">
 
             <div id="step-record" class="step-active w-full">
                 <h2 class="text-xl font-semibold mb-2 text-slate-700">Ready to Start</h2>
@@ -187,35 +178,12 @@
                     </div>
                 </div>
             </div>
-
-             <div id="sign-in-view" class="text-center">
-                <h2 class="text-xl font-semibold mb-2 text-slate-700">Authentication Required</h2>
-                <p class="text-slate-500 mb-6">Please sign in with your Google account to use the application.</p>
-                </div>
         </main>
         <div id="tooltip" class="tooltip"></div>
     </div>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-
-            // -----------------------------------------------------------------
-            // 🚨 VERTEX AI CONFIGURATION - PLEASE FILL THESE OUT 🚨
-            // -----------------------------------------------------------------
-            // 1. Get your Client ID from the Google Cloud Console Credentials page.
-            //    It MUST be an "OAuth 2.0 Client ID" for a "Web application".
-            const OAUTH_CLIENT_ID = "271408664392-lg9bda07u57mrlp236vt21b2j740j8nl.apps.googleusercontent.com";
-
-            // 2. Find your Project ID in the Google Cloud Console dashboard.
-            const PROJECT_ID = "gen-lang-client-0435092745";
-
-            // 3. Specify the region for your project (e.g., "us-central1").
-            const LOCATION = "us-central1";
-            // -----------------------------------------------------------------
-
-            let tokenClient;
-            let accessToken = null;
-
             const appState = {
                 currentStep: 'record',
                 isRecording: false,
@@ -228,12 +196,20 @@
                 noteTemplate: null,
             };
 
-            const mainContentEl = document.getElementById('main-content');
-            const signInViewEl = document.getElementById('sign-in-view');
-            const authContainer = document.getElementById('auth-container');
-            const userInfoEl = document.getElementById('user-info');
-            const userAvatarEl = document.getElementById('user-avatar');
-            const signOutBtn = document.getElementById('sign-out-btn');
+            // -----------------------------------------------------------------
+            // 🚨 VERTEX AI CONFIGURATION - PLEASE FILL THESE OUT 🚨
+            // -----------------------------------------------------------------
+            // 1. Get your API Key from the Google Cloud Console.
+            //    Ensure the "Vertex AI API" is enabled for your project.
+            const GOOGLE_API_KEY = "AIzaSyAJ_4c8bWtj3sUAPz-jvOI9rzoMxxDzmBE";
+
+            // 2. Find your Project ID in the Google Cloud Console dashboard.
+            const PROJECT_ID = "gen-lang-client-0435092745";
+
+            // 3. Specify the region for your project (e.g., "us-central1").
+            const LOCATION = "us-central1";
+            // -----------------------------------------------------------------
+
 
             const stepRecordEl = document.getElementById('step-record');
             const stepProcessingEl = document.getElementById('step-processing');
@@ -267,71 +243,6 @@
             const micIcon = `<svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7 4a3 3 0 016 0v4a3 3 0 11-6 0V4zm4 10.93A7.001 7.001 0 0017 8h-1a6 6 0 11-12 0H3a7.001 7.001 0 006 6.93V17H7a1 1 0 100 2h6a1 1 0 100-2h-2v-2.07z" clip-rule="evenodd"></path></svg>`;
             const stopIcon = `<svg class="w-10 h-10" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M5 3a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V5a2 2 0 00-2-2H5z"></path></svg>`;
 
-            // --- GOOGLE SIGN-IN INITIALIZATION ---
-            window.onGoogleLibraryLoad = () => {
-                // Render the Google Sign-In button
-                google.accounts.id.initialize({
-                    client_id: OAUTH_CLIENT_ID,
-                    callback: handleCredentialResponse,
-                });
-                google.accounts.id.renderButton(
-                    authContainer,
-                    { theme: "outline", size: "large" }
-                );
-                
-                // Initialize the OAuth token client
-                tokenClient = google.accounts.oauth2.initTokenClient({
-                    client_id: OAUTH_CLIENT_ID,
-                    scope: 'https://www.googleapis.com/auth/cloud-platform',
-                    callback: (tokenResponse) => {
-                        accessToken = tokenResponse.access_token;
-                        showApp();
-                    },
-                });
-
-                // Show the sign-in view by default
-                showSignIn();
-            };
-
-            function handleCredentialResponse(response) {
-                // When user is successfully identified, get the access token.
-                tokenClient.requestAccessToken();
-                 // Decode JWT for user info
-                const responsePayload = jwt_decode(response.credential);
-                userAvatarEl.src = responsePayload.picture;
-            }
-            
-             function jwt_decode(token) {
-                try {
-                    return JSON.parse(atob(token.split('.')[1]));
-                } catch (e) {
-                    return null;
-                }
-            }
-
-            function showSignIn() {
-                mainContentEl.classList.add('hidden');
-                signInViewEl.style.display = 'block';
-                authContainer.style.display = 'block';
-                userInfoEl.classList.add('hidden');
-            }
-
-            function showApp() {
-                mainContentEl.classList.remove('hidden');
-                signInViewEl.style.display = 'none';
-                authContainer.style.display = 'none';
-                userInfoEl.classList.remove('hidden');
-                userInfoEl.classList.add('flex');
-                setupMicrophone();
-            }
-
-            signOutBtn.addEventListener('click', () => {
-                accessToken = null;
-                showSignIn();
-            });
-
-            // --- END OF AUTH LOGIC ---
-
             async function setupMicrophone() {
                 try {
                     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -361,7 +272,7 @@
                     recordStatusEl.textContent = 'Microphone Required';
                 }
             }
-            // setupMicrophone(); // Moved to be called after successful sign-in
+            setupMicrophone();
 
             function switchStep(step) {
                 appState.currentStep = step;
@@ -394,8 +305,8 @@
             async function processRecording(audioBlob) {
                 switchStep('processing');
 
-                if (!accessToken) {
-                    updateProcessingStatus('Authentication token is missing. Please sign in again.', true);
+                if (GOOGLE_API_KEY === "YOUR_API_KEY_HERE" || PROJECT_ID === "your-gcp-project-id") {
+                    updateProcessingStatus('API Key or Project ID is not set. Please update the configuration in the script.', true);
                     setTimeout(() => startOver(), 4000);
                     return;
                 }
@@ -404,6 +315,7 @@
                     updateProcessingStatus('Preparing audio...');
                     const audioBase64 = await blobToBase64(audioBlob);
 
+                    // --- VERTEX AI API Endpoint ---
                     const model = 'gemini-1.5-flash-001';
                     const vertexUrl = `https://${LOCATION}-aiplatform.googleapis.com/v1/projects/${PROJECT_ID}/locations/${LOCATION}/publishers/google/models/${model}:generateContent`;
 
@@ -428,17 +340,17 @@
                         contents: [{
                             parts: [
                                 { text: transcribePrompt },
-                                { inlineData: { mimeType: audioBlob.type, data: audioBase64 } }
+                                { inline_data: { mime_type: audioBlob.type, data: audioBase64 } }
                             ]
                         }],
-                        generationConfig: { responseMimeType: "application/json" }
+                        generation_config: { response_mime_type: "application/json" }
                     };
 
                     const transcribeResponse = await fetch(vertexUrl, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${accessToken}`
+                            'Authorization': `Bearer ${GOOGLE_API_KEY}` // Using API Key as Bearer token for this endpoint
                         },
                         body: JSON.stringify(transcribePayload)
                     });
@@ -446,10 +358,10 @@
                     if (!transcribeResponse.ok) {
                         const errorBody = await transcribeResponse.json().catch(() => ({ error: { message: transcribeResponse.statusText } }));
                         let errorMessage = errorBody.error?.message || transcribeResponse.statusText;
-                         if (transcribeResponse.status === 401) {
-                            errorMessage = `Authentication failed (${transcribeResponse.status}): Your sign-in token might have expired. Please sign out and sign back in.`;
-                        } else if (transcribeResponse.status === 403) {
-                           errorMessage = `Permission Denied (${transcribeResponse.status}): Make sure the Vertex AI API is enabled in project '${PROJECT_ID}' and your account has the 'Vertex AI User' role.`;
+                        if (transcribeResponse.status === 403) {
+                           errorMessage = "Vertex AI API has not been used in project or it is disabled. Enable it by visiting the Vertex AI API page in the Google Cloud Console.";
+                        } else if (transcribeResponse.status === 400) {
+                           errorMessage = `Bad Request (${transcribeResponse.status}): ${errorMessage}. Check your Project ID and Region.`;
                         } else {
                            errorMessage = `Transcription failed (${transcribeResponse.status}): ${errorMessage}`;
                         }
@@ -468,20 +380,53 @@
 
                     let soapPrompt;
                     if (appState.noteTemplate) {
-                        soapPrompt = `You are a medical note generation assistant...`; // (prompt omitted for brevity)
+                        soapPrompt = `You are a medical note generation assistant. Your primary task is to extract information from a transcript and structure it into a JSON object.
+You have been provided with a user's preferred note-taking template. Use this template as a stylistic guide for the content you generate for the "note" fields. The final output must still be the JSON object.
+
+**User's Note Template (for style reference):**
+---
+${appState.noteTemplate}
+---
+
+**Transcript to Analyze:**
+---
+${appState.transcript}
+---
+
+**Required JSON Output Structure:**
+Generate a single, valid JSON object with the following keys. For each key, create a "note" that reflects the style of the user's template and a "source" array with exact quotes from the transcript.
+{
+  "subjective": { "note": "...", "source": ["..."] },
+  "objective": { "note": "...", "source": ["..."] },
+  "assessment": { "note": "...", "source": ["..."] },
+  "plan": { "note": "...", "source": ["..."] }
+}
+If a section cannot be determined, provide an empty string for the "note" and an empty array for the "source".`;
                     } else {
-                        soapPrompt = `You are a medical note generation assistant...`; // (prompt omitted for brevity)
+                        soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
+The output MUST be a single, valid JSON object that adheres to the following structure:
+{
+  "subjective": { "note": "A summary of the patient's reported symptoms and feelings.", "source": ["An array of exact quotes from the transcript supporting the subjective note."] },
+  "objective": { "note": "A summary of the dentist's objective findings and observations.", "source": ["An array of exact quotes from the transcript supporting the objective note."] },
+  "assessment": { "note": "The dentist's diagnosis or assessment of the situation.", "source": ["An array of exact quotes from the transcript supporting the assessment."] },
+  "plan": { "note": "The proposed treatment plan, prescriptions, or follow-up actions.", "source": ["An array of exact quotes from the transcript supporting the plan."] }
+}
+If a section cannot be determined from the transcript, provide an empty string for the "note" and an empty array for the "source". Do not omit any keys.
+Transcript to analyze:
+---
+${appState.transcript}
+---`;
                     }
 
                     const soapPayload = {
                         contents: [{ parts: [{ text: soapPrompt }] }],
-                        generationConfig: { responseMimeType: "application/json" }
+                        generation_config: { response_mime_type: "application/json" }
                     };
                     const soapResponse = await fetch(vertexUrl, {
                         method: 'POST',
                         headers: {
                            'Content-Type': 'application/json',
-                           'Authorization': `Bearer ${accessToken}`
+                           'Authorization': `Bearer ${GOOGLE_API_KEY}`
                         },
                         body: JSON.stringify(soapPayload)
                     });
@@ -506,7 +451,7 @@
                 } catch (error) {
                     console.error("Processing Error:", error);
                     updateProcessingStatus(`${error.message}`, true);
-                    setTimeout(() => startOver(), 8000);
+                    setTimeout(() => startOver(), 6000);
                 }
             }
 
@@ -522,12 +467,162 @@
             function populateReviewData(structuredTranscript, soapNotes, audioBlob) {
                 const audioUrl = URL.createObjectURL(audioBlob);
                 audioPlayerContainer.innerHTML = `<audio controls src="${audioUrl}" class="w-full"></audio>`;
-                // ... (rest of the function is the same, omitted for brevity)
+
+                const downloadLink = document.createElement('a');
+                downloadLink.href = audioUrl;
+                downloadLink.download = `dental-recording-${new Date().toISOString()}.wav`;
+                downloadLink.innerHTML = `<button class="w-full text-sm bg-slate-200 text-slate-700 px-4 py-2 rounded-md hover:bg-slate-300 transition-all font-medium flex items-center justify-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Download Recording
+                    </button>`;
+                downloadContainer.innerHTML = '';
+                downloadContainer.appendChild(downloadLink);
+
+                const plainTranscript = structuredTranscript.map(line => `${formatTimestamp(line.timestamp)} ${line.speaker}: ${line.text}`).join('\n');
+                const transcriptBlob = new Blob([plainTranscript], { type: 'text/plain;charset=utf-8' });
+                const transcriptUrl = URL.createObjectURL(transcriptBlob);
+                const transcriptDownloadLink = document.createElement('a');
+                transcriptDownloadLink.href = transcriptUrl;
+                transcriptDownloadLink.download = `dental-transcript-${new Date().toISOString()}.txt`;
+                transcriptDownloadLink.innerHTML = `<svg class="w-5 h-5 text-slate-500 hover:text-slate-700 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>`;
+                transcriptDownloadLink.title = "Download Transcript (.txt)";
+                transcriptDownloadContainer.innerHTML = '';
+                transcriptDownloadContainer.appendChild(transcriptDownloadLink);
+
+                transcriptContainer.innerHTML = structuredTranscript.map(line => {
+                    const speakerClass = line.speaker.toLowerCase().includes('dentist') ? 'text-slate-700' : 'text-amber-700';
+                    const fullText = `${line.speaker}: ${line.text}`;
+                    return `<div class="transcript-line" data-text="${fullText}">
+                        <p class="font-semibold text-sm ${speakerClass}">
+                            <span class="text-slate-400 font-mono text-xs">${formatTimestamp(line.timestamp)}</span>
+                            ${line.speaker}
+                        </p>
+                        <p class="text-slate-600 text-sm pl-12">${line.text}</p>
+                    </div>`;
+                }).join('');
+
+                soapS.value = soapNotes.subjective?.note || "Could not generate.";
+                soapO.value = soapNotes.objective?.note || "Could not generate.";
+                soapA.value = soapNotes.assessment?.note || "Could not generate.";
+                soapP.value = soapNotes.plan?.note || "Could not generate.";
             }
-             function startOver() {
-                // ... (function is the same, omitted for brevity)
+
+            function startOver() {
+                appState.isRecording = false;
+                appState.audioBlob = null;
+                appState.transcript = null;
+                appState.structuredTranscript = [];
+                appState.soapSources = {};
+                appState.noteTemplate = null;
+                audioPlayerContainer.innerHTML = '';
+                downloadContainer.innerHTML = '';
+                transcriptContainer.innerHTML = '';
+                transcriptDownloadContainer.innerHTML = '';
+                uploadAudioInput.value = '';
+                templateUploadInput.value = '';
+                templateStatus.textContent = '';
+
+                recordStatusEl.textContent = 'Click to Record';
+                recordBtn.classList.remove('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
+                recordBtn.classList.add('bg-slate-700', 'hover:bg-slate-800');
+                recordIconContainer.innerHTML = micIcon;
+                recordBtn.disabled = false;
+                uploadLabel.classList.remove('hidden');
+                updateProcessingStatus('Initializing...');
+                switchStep('record');
             }
-            // ... (all other helper functions and event listeners are the same)
+
+            recordBtn.addEventListener('click', () => {
+                if (!appState.mediaRecorder) return;
+
+                appState.isRecording = !appState.isRecording;
+                if (appState.isRecording) {
+                    appState.mediaRecorder.start();
+                    recordStatusEl.textContent = 'Recording...';
+                    recordBtn.classList.add('bg-purple-500', 'hover:bg-purple-600', 'pulse-purple');
+                    recordBtn.classList.remove('bg-slate-700', 'hover:bg-slate-800');
+                    recordIconContainer.innerHTML = stopIcon;
+                    uploadLabel.classList.add('hidden');
+                } else {
+                    appState.mediaRecorder.stop();
+                    recordStatusEl.textContent = 'Processing...';
+                    recordBtn.disabled = true;
+                }
+            });
+
+            uploadAudioInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    recordBtn.disabled = true;
+                    uploadLabel.classList.add('hidden');
+                    processRecording(file);
+                }
+            });
+
+            templateUploadInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        appState.noteTemplate = e.target.result;
+                        templateStatus.textContent = `Template "${file.name}" loaded.`;
+                        templateStatus.classList.add('text-green-600');
+                    };
+                    reader.readAsText(file);
+                }
+            });
+
+            startOverBtn.addEventListener('click', startOver);
+
+            copyNoteBtn.addEventListener('click', () => {
+                const fullNote = `Subjective:\n${soapS.value}\n\nObjective:\n${soapO.value}\n\nAssessment:\n${soapA.value}\n\nPlan:\n${soapP.value}\n\n---\n\nFull Transcript:\n${appState.transcript || 'N/A'}`;
+
+                const dummyTextArea = document.createElement('textarea');
+                dummyTextArea.value = fullNote;
+                document.body.appendChild(dummyTextArea);
+                dummyTextArea.select();
+                try {
+                    document.execCommand('copy');
+                    copySuccessMsg.classList.remove('hidden');
+                    setTimeout(() => copySuccessMsg.classList.add('hidden'), 2000);
+                } catch (err) {
+                    console.error('Failed to copy text: ', err);
+                }
+                document.body.removeChild(dummyTextArea);
+            });
+
+            document.querySelectorAll('.info-icon').forEach(icon => {
+                icon.addEventListener('mouseenter', (e) => {
+                    const target = e.currentTarget.dataset.target;
+                    const sources = appState.soapSources[target];
+                    if (sources && sources.length > 0) {
+                        tooltip.innerHTML = '<strong>Source from transcript:</strong>' + sources.map(s => `<div class="tooltip-source">"${s}"</div>`).join('');
+                        tooltip.style.display = 'block';
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        tooltip.style.left = `${rect.right + 10}px`;
+                        tooltip.style.top = `${rect.top}px`;
+                    }
+                });
+                icon.addEventListener('mouseleave', () => {
+                    tooltip.style.display = 'none';
+                });
+            });
+
+            document.querySelectorAll('.soap-input').forEach(input => {
+                input.addEventListener('focus', (e) => {
+                    const section = e.currentTarget.dataset.section;
+                    const sources = appState.soapSources[section];
+
+                    document.querySelectorAll('.transcript-line').forEach(line => {
+                        line.classList.remove('transcript-highlight');
+                        const lineText = line.dataset.text;
+                        if (sources && sources.some(source => lineText.includes(source))) {
+                            line.classList.add('transcript-highlight');
+                        }
+                    });
+                });
+            });
+
         });
     </script>
 </body>
