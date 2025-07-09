@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Dental Note Assistant</title>
+    <title>AI Dental Note Assistant 1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -310,22 +310,23 @@
                 });
             }
 
-            async function processRecording(audioBlob) {
-                switchStep('processing');
-                
-                if (GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
-                    updateProcessingStatus('API Key is not set. Please hardcode your key in the script.', true);
-                    setTimeout(() => startOver(), 4000);
-                    return;
-                }
-                
-                try {
-                    updateProcessingStatus('Preparing audio...');
-                    const audioBase64 = await blobToBase64(audioBlob);
-                    
-                    updateProcessingStatus('Transcribing with AI...');
-                    const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`;
-                    const transcribePrompt = `You are an expert transcriptionist. Transcribe the following audio of a dental consultation.
+           async function processRecording(audioBlob) {
+    switchStep('processing');
+
+    if (GEMINI_API_KEY === "YOUR_API_KEY_HERE") {
+        updateProcessingStatus('API Key is not set. Please hardcode your key in the script.', true);
+        setTimeout(() => startOver(), 4000);
+        return;
+    }
+
+    try {
+        updateProcessingStatus('Preparing audio...');
+        const audioBase64 = await blobToBase64(audioBlob);
+
+        // First Batch Call: Transcription
+        updateProcessingStatus('Transcribing with Gemini 1.5 Flash (Batch)...');
+        const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:batchPredict?key=${GEMINI_API_KEY}`;
+        const transcribePrompt = `You are an expert transcriptionist. Transcribe the following audio of a dental consultation.
 The output MUST be a single, valid JSON array.
 Each object in the array should represent a single utterance and have three keys:
 1. "speaker": A string, either "Dentist" or "Patient".
@@ -338,116 +339,119 @@ Example:
   { "speaker": "Patient", "text": "I have a toothache.", "timestamp": 3.5 }
 ]`;
 
-                    const transcribePayload = {
-                        contents: [{
-                            parts: [
-                                { text: transcribePrompt },
-                                { inlineData: { mimeType: audioBlob.type, data: audioBase64 } }
-                            ]
-                        }],
-                        generationConfig: { responseMimeType: "application/json" }
-                    };
-                    const transcribeResponse = await fetch(transcribeUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(transcribePayload)
-                    });
-                    
-                    if (!transcribeResponse.ok) {
-                        const errorBody = await transcribeResponse.json().catch(() => ({ error: { message: transcribeResponse.statusText } }));
-                        let errorMessage = errorBody.error?.message || transcribeResponse.statusText;
-                        if (transcribeResponse.status === 400 && errorMessage.includes("API key not valid")) {
-                           errorMessage = "API Key not valid. Please check the key and ensure the Generative Language API is enabled in your Google Cloud project.";
-                        } else {
-                           errorMessage = `Transcription failed (${transcribeResponse.status}): ${errorMessage}`;
-                        }
-                        throw new Error(errorMessage);
-                    }
-                    const transcribeResult = await transcribeResponse.json();
-                    
-                    if (!transcribeResult.candidates || transcribeResult.candidates.length === 0) {
-                        throw new Error("Transcription returned no content. The audio might be silent or too short.");
-                    }
-                    appState.structuredTranscript = JSON.parse(transcribeResult.candidates[0].content.parts[0].text);
-                    appState.transcript = appState.structuredTranscript.map(line => `${line.speaker}: ${line.text}`).join('\n');
+        const transcribePayload = {
+            instances: [
+                {
+                    prompt: transcribePrompt + `\n\n[audio data follows]`,
+                    inlineData: { mimeType: audioBlob.type, data: audioBase64 }
+                }
+            ],
+            parameters: {
+                temperature: 0.7,
+                candidateCount: 1
+            }
+        };
 
+        const transcribeResponse = await fetch(transcribeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(transcribePayload)
+        });
 
-                    updateProcessingStatus('Generating SOAP notes with citations...');
-                    
-                    let soapPrompt;
-                    if (appState.noteTemplate) {
-                        soapPrompt = `You are a medical note generation assistant. Your primary task is to extract information from a transcript and structure it into a JSON object.
-You have been provided with a user's preferred note-taking template. Use this template as a stylistic guide for the content you generate for the "note" fields. The final output must still be the JSON object.
+        if (!transcribeResponse.ok) {
+            const errorBody = await transcribeResponse.json().catch(() => ({ error: { message: transcribeResponse.statusText } }));
+            throw new Error(`Transcription failed (${transcribeResponse.status}): ${errorBody.error?.message || transcribeResponse.statusText}`);
+        }
 
-**User's Note Template (for style reference):**
+        const transcribeResult = await transcribeResponse.json();
+        const transcriptionText = transcribeResult.predictions?.[0]?.content || "";
+        appState.structuredTranscript = JSON.parse(transcriptionText);
+        appState.transcript = appState.structuredTranscript.map(line => `${line.speaker}: ${line.text}`).join('\n');
+
+        // Second Batch Call: SOAP Notes
+        updateProcessingStatus('Generating SOAP notes with citations (Batch)...');
+        let soapPrompt;
+        if (appState.noteTemplate) {
+            soapPrompt = `You are a medical note generation assistant. Your primary task is to extract information from a transcript and structure it into a JSON object.
+You have been provided with a user's preferred note-taking template. Use this template as a stylistic guide for the content you generate for the "note" fields.
+
+Template:
 ---
 ${appState.noteTemplate}
 ---
 
-**Transcript to Analyze:**
+Transcript:
 ---
 ${appState.transcript}
 ---
 
-**Required JSON Output Structure:**
-Generate a single, valid JSON object with the following keys. For each key, create a "note" that reflects the style of the user's template and a "source" array with exact quotes from the transcript.
+Output JSON:
 {
   "subjective": { "note": "...", "source": ["..."] },
   "objective": { "note": "...", "source": ["..."] },
   "assessment": { "note": "...", "source": ["..."] },
   "plan": { "note": "...", "source": ["..."] }
-}
-If a section cannot be determined, provide an empty string for the "note" and an empty array for the "source".`;
-                    } else {
-                        soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
-The output MUST be a single, valid JSON object that adheres to the following structure:
-{
-  "subjective": { "note": "A summary of the patient's reported symptoms and feelings.", "source": ["An array of exact quotes from the transcript supporting the subjective note."] },
-  "objective": { "note": "A summary of the dentist's objective findings and observations.", "source": ["An array of exact quotes from the transcript supporting the objective note."] },
-  "assessment": { "note": "The dentist's diagnosis or assessment of the situation.", "source": ["An array of exact quotes from the transcript supporting the assessment."] },
-  "plan": { "note": "The proposed treatment plan, prescriptions, or follow-up actions.", "source": ["An array of exact quotes from the transcript supporting the plan."] }
-}
-If a section cannot be determined from the transcript, provide an empty string for the "note" and an empty array for the "source". Do not omit any keys.
-Transcript to analyze:
+}`;
+        } else {
+            soapPrompt = `You are a medical note generation assistant. Your task is to analyze a dental consultation transcript and generate a structured clinical SOAP note.
+
+Transcript:
 ---
 ${appState.transcript}
----`;
-                    }
-                    
-                    const soapPayload = {
-                        contents: [{ parts: [{ text: soapPrompt }] }],
-                        generationConfig: { responseMimeType: "application/json" }
-                    };
-                    const soapResponse = await fetch(transcribeUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(soapPayload)
-                    });
-                     if (!soapResponse.ok) {
-                        const errorBody = await soapResponse.json().catch(() => ({ error: { message: soapResponse.statusText } }));
-                        const errorMessage = errorBody.error?.message || soapResponse.statusText;
-                        throw new Error(`SOAP generation failed (${soapResponse.status}): ${errorMessage}`);
-                    }
-                    const soapResult = await soapResponse.json();
-                    const soapNotes = JSON.parse(soapResult.candidates[0].content.parts[0].text);
-                    
-                    appState.soapSources = {
-                        subjective: soapNotes.subjective?.source || [],
-                        objective: soapNotes.objective?.source || [],
-                        assessment: soapNotes.assessment?.source || [],
-                        plan: soapNotes.plan?.source || [],
-                    };
+---
 
-                    populateReviewData(appState.structuredTranscript, soapNotes, audioBlob);
-                    switchStep('review');
+Output JSON:
+{
+  "subjective": { "note": "...", "source": ["..."] },
+  "objective": { "note": "...", "source": ["..."] },
+  "assessment": { "note": "...", "source": ["..."] },
+  "plan": { "note": "...", "source": ["..."] }
+}`;
+        }
 
-                } catch (error) {
-                    console.error("Processing Error:", error);
-                    updateProcessingStatus(`${error.message}`, true);
-                    setTimeout(() => startOver(), 6000);
+        const soapPayload = {
+            instances: [
+                {
+                    prompt: soapPrompt
                 }
+            ],
+            parameters: {
+                temperature: 0.3,
+                candidateCount: 1
             }
-            
+        };
+
+        const soapResponse = await fetch(transcribeUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(soapPayload)
+        });
+
+        if (!soapResponse.ok) {
+            const errorBody = await soapResponse.json().catch(() => ({ error: { message: soapResponse.statusText } }));
+            throw new Error(`SOAP generation failed (${soapResponse.status}): ${errorBody.error?.message || soapResponse.statusText}`);
+        }
+
+        const soapResult = await soapResponse.json();
+        const soapNotes = JSON.parse(soapResult.predictions?.[0]?.content || "{}");
+
+        appState.soapSources = {
+            subjective: soapNotes.subjective?.source || [],
+            objective: soapNotes.objective?.source || [],
+            assessment: soapNotes.assessment?.source || [],
+            plan: soapNotes.plan?.source || [],
+        };
+
+        populateReviewData(appState.structuredTranscript, soapNotes, audioBlob);
+        switchStep('review');
+
+    } catch (error) {
+        console.error("Processing Error:", error);
+        updateProcessingStatus(`${error.message}`, true);
+        setTimeout(() => startOver(), 6000);
+    }
+}
+ 
             function formatTimestamp(seconds) {
                 if (typeof seconds !== 'number' || isNaN(seconds)) {
                     return '[--:--]';
